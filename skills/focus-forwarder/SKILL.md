@@ -21,7 +21,7 @@ Before installing the plugin, save `userId` to `~/.openclaw/focus-world/identity
 Then install and enable the plugin:
 
 ```bash
-openclaw plugins install @yahaha-studio/focus-forwarder@0.0.1-alpha.3
+openclaw plugins install @yahaha-studio/focus-forwarder@0.0.1-alpha.4
 openclaw plugins enable focus-forwarder
 ```
 
