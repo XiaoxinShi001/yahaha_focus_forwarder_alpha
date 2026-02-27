@@ -25,6 +25,15 @@ openclaw plugins install @yahaha-studio/focus-forwarder@0.0.1-alpha.3
 openclaw plugins enable focus-forwarder
 ```
 
+If package installation fails, install from source instead:
+
+```bash
+git clone https://github.com/XiaoxinShi001/yahaha_focus_forwarder_alpha
+cd yahaha_focus_forwarder_alpha
+openclaw plugins install .
+openclaw plugins enable focus-forwarder
+```
+
 Manual step required: restart OpenClaw after enabling the plugin (user must do this manually).
 
 ## Tools
