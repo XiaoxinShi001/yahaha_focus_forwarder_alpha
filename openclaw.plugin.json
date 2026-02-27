@@ -1,0 +1,31 @@
+{
+  "id": "focus-forwarder",
+  "name": "Focus Forwarder",
+  "description": "Forward agent status to Focus world",
+  "version": "0.2.1",
+  "author": "OpenClaw",
+  "skills": ["./skills/focus-forwarder"],
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "wsUrl": {
+        "type": "string",
+        "default": "ws://172.18.189.177:48870"
+      },
+      "enabled": {
+        "type": "boolean",
+        "default": true
+      },
+      "cooldownMs": {
+        "type": "number",
+        "default": 15000
+      }
+    }
+  },
+  "uiHints": {
+    "wsUrl": { "label": "WebSocket URL", "placeholder": "ws://172.18.189.177:48870/ws/openclaw" },
+    "enabled": { "label": "Enable Plugin" },
+    "cooldownMs": { "label": "Status Cooldown (ms)", "placeholder": "15000" }
+  }
+}
