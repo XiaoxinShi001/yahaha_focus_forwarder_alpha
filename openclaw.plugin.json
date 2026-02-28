@@ -10,8 +10,7 @@
     "additionalProperties": false,
     "properties": {
       "wsUrl": {
-        "type": "string",
-        "default": "ws://43.106.148.251:48870"
+        "type": "string"
       },
       "enabled": {
         "type": "boolean",
@@ -24,7 +23,7 @@
     }
   },
   "uiHints": {
-    "wsUrl": { "label": "WebSocket URL", "placeholder": "ws://43.106.148.251:48870/ws/openclaw" },
+    "wsUrl": { "label": "WebSocket URL", "placeholder": "ws://host:port/ws/openclaw" },
     "enabled": { "label": "Enable Plugin" },
     "cooldownMs": { "label": "Status Cooldown (ms)", "placeholder": "15000" }
   }

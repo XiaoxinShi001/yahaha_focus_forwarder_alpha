@@ -10,7 +10,11 @@ Sync your working status to Focus virtual world, and perform actions on command.
 
 ## Plugin Setup
 
-Before installing the plugin, save `userId` to `~/.openclaw/focus-world/identity.json`:
+Before installing the plugin, save `userId` to the `identity.json` file under the current user's home directory:
+
+- Linux: `~/.openclaw/focus-world/identity.json`
+- macOS: `~/.openclaw/focus-world/identity.json`
+- Windows: `%USERPROFILE%\\.openclaw\\focus-world\\identity.json`
 
 ```json
 {
@@ -21,7 +25,7 @@ Before installing the plugin, save `userId` to `~/.openclaw/focus-world/identity
 Then install and enable the plugin:
 
 ```bash
-openclaw plugins install @yahaha-studio/focus-forwarder@0.0.1-alpha.5
+openclaw plugins install @yahaha-studio/focus-forwarder@0.0.1-alpha.7
 openclaw plugins enable focus-forwarder
 ```
 
@@ -46,13 +50,13 @@ Join Focus World with a userId.
 focus_join(userId: "your-user-id")
 ```
 
-If `userId` already exists in `~/.openclaw/focus-world/identity.json`, you can call:
+If `userId` already exists in the home-directory `identity.json` file, you can call:
 
 ```text
 focus_join()
 ```
 
-`authKey` is automatically saved to `~/.openclaw/focus-world/identity.json`.
+`authKey` is automatically saved to that same `identity.json` file in the user's home directory.
 
 ### focus_leave
 
@@ -168,12 +172,18 @@ User says: "Enable Focus Forwarder LLM requests again"
 
 ## Files
 
-- `~/.openclaw/focus-world/identity.json` - userId (bootstrap) and authKey (managed by plugin)
-- `~/.openclaw/focus-world/skills-config.json` - actions, fallbacks, and `llm.enabled` runtime config
+The plugin stores files under the current user's home directory in `.openclaw/focus-world/`.
+
+- Linux: `~/.openclaw/focus-world/`
+- macOS: `~/.openclaw/focus-world/`
+- Windows: `%USERPROFILE%\\.openclaw\\focus-world\\`
+
+- `identity.json` - userId (bootstrap) and authKey (managed by plugin)
+- `skills-config.json` - actions, fallbacks, and `llm.enabled` runtime config
 
 ## Skills Config
 
-Custom actions and the Focus Forwarder LLM toggle can be configured in `~/.openclaw/focus-world/skills-config.json`:
+Custom actions and the Focus Forwarder LLM toggle can be configured in the home-directory `skills-config.json` file:
 
 ```json
 {
@@ -200,6 +210,6 @@ When `llm.enabled` is `true`, automatic status sync uses `pickActionWithLLM`. Wh
 
 - Plugin automatically syncs status when you are working
 - Automatic sync uses LLM only when `llm.enabled` is `true`
-- `focus_set_llm_enabled` updates `~/.openclaw/focus-world/skills-config.json` and takes effect immediately
+- `focus_set_llm_enabled` updates the home-directory `skills-config.json` file and takes effect immediately
 - Use `focus_action` to manually perform specific actions on user request
 - Bubble text shows short status, up to 5 words

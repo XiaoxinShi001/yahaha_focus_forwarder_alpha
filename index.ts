@@ -279,7 +279,9 @@ interface AgentState {
   pendingLLM: boolean;
   llmCancelled: boolean;
   llmRequestId: number;
+  cooldownActive: boolean;
   cooldownStartTime: number;
+  cooldownTimer?: ReturnType<typeof setTimeout>;
   lastLLMResult?: { poseType: PoseType; action: string };
 }
 
@@ -290,10 +292,27 @@ let syncCooldownMs = 15000;
 function getAgentState(agentId: string): AgentState {
   let state = agentStates.get(agentId);
   if (!state) {
-    state = { pendingLLM: false, llmCancelled: false, llmRequestId: 0, cooldownStartTime: 0 };
+    state = {
+      pendingLLM: false,
+      llmCancelled: false,
+      llmRequestId: 0,
+      cooldownActive: false,
+      cooldownStartTime: 0,
+    };
     agentStates.set(agentId, state);
   }
   return state;
+}
+
+function startCooldown(state: AgentState, agentId: string, startTime: number) {
+  if (state.cooldownTimer) clearTimeout(state.cooldownTimer);
+  state.cooldownActive = true;
+  state.cooldownStartTime = startTime;
+  state.cooldownTimer = setTimeout(() => {
+    state.cooldownActive = false;
+    state.cooldownTimer = undefined;
+    pluginApi?.logger.debug(`[focus] cooldown ended for agent ${agentId}`);
+  }, syncCooldownMs);
 }
 
 // Cleanup stale agent states to prevent memory leaks
@@ -301,6 +320,7 @@ function cleanupStaleAgents() {
   const now = Date.now();
   for (const [agentId, state] of agentStates) {
     if (!state.pendingLLM && now - state.cooldownStartTime > AGENT_STATE_TTL_MS) {
+      if (state.cooldownTimer) clearTimeout(state.cooldownTimer);
       agentStates.delete(agentId);
       pluginApi?.logger.debug(`[focus] cleaned up stale agent state: ${agentId}`);
     }
@@ -317,7 +337,6 @@ function applyLlmEnabledChange(enabled: boolean): SkillsConfig {
     llm: { ...current.llm, enabled },
   }));
   for (const state of agentStates.values()) {
-    state.cooldownStartTime = 0;
     state.pendingLLM = false;
     if (!enabled) {
       state.llmCancelled = true;
@@ -348,8 +367,15 @@ function syncStatus(context: string, agentId: string) {
   
   const state = getAgentState(agentId);
   const now = Date.now();
-  const elapsed = now - state.cooldownStartTime;
-  const inCooldown = state.cooldownStartTime > 0 && elapsed < syncCooldownMs;
+  const elapsed = state.cooldownStartTime > 0 ? now - state.cooldownStartTime : 0;
+  if (state.cooldownActive && elapsed >= syncCooldownMs) {
+    state.cooldownActive = false;
+    if (state.cooldownTimer) {
+      clearTimeout(state.cooldownTimer);
+      state.cooldownTimer = undefined;
+    }
+  }
+  const inCooldown = state.cooldownActive;
   const llmEnabled = isLlmEnabled();
   
   pluginApi?.logger.info(`[focus] syncStatus: agent=${agentId} elapsed=${elapsed}ms inCooldown=${inCooldown} pendingLLM=${state.pendingLLM} llmEnabled=${llmEnabled}`);
@@ -368,7 +394,7 @@ function syncStatus(context: string, agentId: string) {
   }
   
   // Start new LLM request
-  state.cooldownStartTime = now;
+  startCooldown(state, agentId, now);
   state.pendingLLM = true;
   state.llmCancelled = false;
   const requestId = state.llmRequestId + 1;
