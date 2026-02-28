@@ -95,7 +95,7 @@ function loadSkillsConfig(): SkillsConfig {
       if (stat.mtimeMs !== cachedConfigMtime || !cachedConfig) {
         const raw = fs.readFileSync(SKILLS_CONFIG_PATH, "utf-8");
         updateCachedSkillsConfig(normalizeSkillsConfig(JSON.parse(raw)));
-        pluginApi?.logger.info(`[focus] Loaded skills config`);
+        pluginApi?.logger.debug(`[focus] Loaded skills config`);
       }
       return cachedConfig!;
     }
@@ -216,7 +216,7 @@ async function pickActionWithLLM(context: string): Promise<ActionResult> {
     const provider = typeof primary === "string" ? primary.split("/")[0] : undefined;
     const model = typeof primary === "string" ? primary.split("/").slice(1).join("/") : undefined;
     
-    pluginApi?.logger.info(`[focus] LLM params: provider=${provider} model=${model} primary=${primary}`);
+    pluginApi?.logger.debug(`[focus] LLM params: provider=${provider} model=${model} primary=${primary}`);
     
     // Get auth profile (e.g., "synthetic:default")
     const authProfiles = pluginApi?.config?.auth?.profiles || {};
@@ -336,6 +336,7 @@ function applyLlmEnabledChange(enabled: boolean): SkillsConfig {
     ...current,
     llm: { ...current.llm, enabled },
   }));
+  pluginApi?.logger.info(`[focus] Automatic LLM action picking ${enabled ? "enabled" : "disabled"}`);
   for (const state of agentStates.values()) {
     state.pendingLLM = false;
     if (!enabled) {
@@ -361,7 +362,7 @@ function sendFallbackInternal(context: string, agentId: string) {
 
 function syncStatus(context: string, agentId: string) {
   if (!service?.isConnected()) {
-    pluginApi?.logger.info(`[focus] skipped: not connected`);
+    pluginApi?.logger.debug(`[focus] skipped: not connected`);
     return;
   }
   
@@ -378,17 +379,17 @@ function syncStatus(context: string, agentId: string) {
   const inCooldown = state.cooldownActive;
   const llmEnabled = isLlmEnabled();
   
-  pluginApi?.logger.info(`[focus] syncStatus: agent=${agentId} elapsed=${elapsed}ms inCooldown=${inCooldown} pendingLLM=${state.pendingLLM} llmEnabled=${llmEnabled}`);
+  pluginApi?.logger.debug(`[focus] syncStatus: agent=${agentId} elapsed=${elapsed}ms inCooldown=${inCooldown} pendingLLM=${state.pendingLLM} llmEnabled=${llmEnabled}`);
 
   if (!llmEnabled) {
-    pluginApi?.logger.info(`[focus] LLM disabled, using fallback mapping for agent ${agentId}`);
+    pluginApi?.logger.debug(`[focus] LLM disabled, using fallback mapping for agent ${agentId}`);
     sendFallbackInternal(context, agentId);
     return;
   }
   
   // In cooldown OR LLM pending: send fallback
   if (inCooldown || state.pendingLLM) {
-    pluginApi?.logger.info(`[focus] sending fallback (inCooldown=${inCooldown} pendingLLM=${state.pendingLLM})`);
+    pluginApi?.logger.debug(`[focus] sending fallback (inCooldown=${inCooldown} pendingLLM=${state.pendingLLM})`);
     sendFallbackInternal(context, agentId);
     return;
   }
@@ -399,7 +400,7 @@ function syncStatus(context: string, agentId: string) {
   state.llmCancelled = false;
   const requestId = state.llmRequestId + 1;
   state.llmRequestId = requestId;
-  pluginApi?.logger.info(`[focus] calling LLM for agent ${agentId}`);
+  pluginApi?.logger.debug(`[focus] calling LLM for agent ${agentId}`);
   
   pickActionWithLLM(context)
     .then((action) => {
@@ -545,13 +546,13 @@ const plugin = {
 
     // sendWithLLM: use LLM with cooldown
     const sendWithLLM = (context: string, agentId: string) => {
-      pluginApi?.logger.info(`[focus] hook fired: agent=${agentId} context="${context.slice(0, 50)}" hasIdentity=${service?.hasValidIdentity()}`);
+      pluginApi?.logger.debug(`[focus] hook fired: agent=${agentId} context="${context.slice(0, 50)}" hasIdentity=${service?.hasValidIdentity()}`);
       if (service?.hasValidIdentity()) syncStatus(context, agentId);
     };
 
     // sendFallback: always use fallback, no LLM (for after_tool_call)
     const sendFallback = (context: string, agentId: string) => {
-      pluginApi?.logger.info(`[focus] fallback: agent=${agentId} context="${context.slice(0, 50)}"`);
+      pluginApi?.logger.debug(`[focus] fallback: agent=${agentId} context="${context.slice(0, 50)}"`);
       if (service?.hasValidIdentity()) sendFallbackInternal(context, agentId);
     };
     
@@ -567,7 +568,7 @@ const plugin = {
     });
     api.on("before_tool_call", (event: any, ctx?: { agentId?: string; sessionKey?: string }) => {
       const agentId = ctx?.agentId || ctx?.sessionKey || "main";
-      pluginApi?.logger.info(`[focus] before_tool_call ctx: ${JSON.stringify(ctx)}`);
+      pluginApi?.logger.debug(`[focus] before_tool_call ctx: ${JSON.stringify(ctx)}`);
       const params = event.params ? JSON.stringify(event.params) : "";
       sendWithLLM(`[${agentId}] Tool: ${event.toolName}${params ? ` ${params}` : ""}`, agentId);
     });

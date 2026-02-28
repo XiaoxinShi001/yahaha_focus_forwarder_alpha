@@ -54,7 +54,7 @@ export class FocusForwarderService {
       // Automatically send rejoin when a valid identity is available.
       if (this.identity?.userId && this.identity?.authKey) {
         this.ws?.send(JSON.stringify({ type: "rejoin", userId: this.identity.userId, authKey: this.identity.authKey }));
-        this.logger.info(`Sent rejoin for ${this.identity.userId}`);
+        this.logger.debug(`Sent rejoin for ${this.identity.userId}`);
       }
     });
     this.ws.on("message", (data) => this.handleMessage(data.toString()));
