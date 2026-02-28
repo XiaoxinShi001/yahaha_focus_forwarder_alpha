@@ -21,7 +21,7 @@ Before installing the plugin, save `userId` to `~/.openclaw/focus-world/identity
 Then install and enable the plugin:
 
 ```bash
-openclaw plugins install @yahaha-studio/focus-forwarder@0.0.1-alpha.4
+openclaw plugins install @yahaha-studio/focus-forwarder@0.0.1-alpha.5
 openclaw plugins enable focus-forwarder
 ```
 
@@ -34,7 +34,7 @@ openclaw plugins install .
 openclaw plugins enable focus-forwarder
 ```
 
-Manual step required: restart OpenClaw after enabling the plugin (user must do this manually).
+Manual step required: restart OpenClaw after enabling the plugin.
 
 ## Tools
 
@@ -42,13 +42,13 @@ Manual step required: restart OpenClaw after enabling the plugin (user must do t
 
 Join Focus World with a userId.
 
-```
+```text
 focus_join(userId: "your-user-id")
 ```
 
 If `userId` already exists in `~/.openclaw/focus-world/identity.json`, you can call:
 
-```
+```text
 focus_join()
 ```
 
@@ -58,22 +58,33 @@ focus_join()
 
 Leave Focus World and clear authKey.
 
-```
+```text
 focus_leave()
 ```
 
 ### focus_action
 
-Send an action/pose to Focus World. Use this when a user asks you to do something in Focus (for example: "dance", "wave", "sit and type").
+Send an action or pose to Focus World. Use this when a user asks you to do something in Focus, for example "dance", "wave", or "sit and type".
 
-```
+```text
 focus_action(poseType: "stand", action: "Yay", bubble: "Dancing!")
 ```
 
 Parameters:
-- `poseType` (required): Pose type - `stand`, `sit`, `lay`, or `floor`
-- `action` (required): Action name to perform (must match poseType)
-- `bubble` (optional): Text to display in bubble (max 5 words)
+- `poseType` (required): `stand`, `sit`, `lay`, or `floor`
+- `action` (required): Action name to perform
+- `bubble` (optional): Bubble text to display, max 5 words
+
+### focus_set_llm_enabled
+
+Enable or disable LLM-based automatic action selection for Focus Forwarder. Use this when the user asks to stop or resume LLM-based action picking for Focus Forwarder.
+
+```text
+focus_set_llm_enabled(enabled: false)
+```
+
+Parameters:
+- `enabled` (required): `true` to use `pickActionWithLLM` for automatic status sync, `false` to force all automatic status updates to use fallback keyword mapping
 
 ## Available Actions
 
@@ -149,17 +160,26 @@ User says: "Sit down and type"
 User says: "Lie flat"
 -> `focus_action(poseType: "lay", action: "Lie Flat", bubble: "Relaxing...")`
 
+User says: "Disable Focus Forwarder LLM requests"
+-> `focus_set_llm_enabled(enabled: false)`
+
+User says: "Enable Focus Forwarder LLM requests again"
+-> `focus_set_llm_enabled(enabled: true)`
+
 ## Files
 
 - `~/.openclaw/focus-world/identity.json` - userId (bootstrap) and authKey (managed by plugin)
-- `~/.openclaw/focus-world/skills-config.json` - actions and fallbacks config
+- `~/.openclaw/focus-world/skills-config.json` - actions, fallbacks, and `llm.enabled` runtime config
 
 ## Skills Config
 
-Custom actions can be configured in `~/.openclaw/focus-world/skills-config.json`:
+Custom actions and the Focus Forwarder LLM toggle can be configured in `~/.openclaw/focus-world/skills-config.json`:
 
 ```json
 {
+  "llm": {
+    "enabled": true
+  },
   "actions": {
     "stand": ["HIgh Five", "Listen Music", "Arm Stretch", "BackBend Stretch", "Making Selfie", "Arms Crossed", "Epiphany", "Angry", "Yay", "Dance", "Sing", "Tired", "Wait", "Stand Phone Talk", "Stand Phone Play", "Curtsy"],
     "sit": ["Typing with Keyboard", "Thinking", "Study Look At", "Writing", "Crazy", "Homework", "Take Notes", "Hand Cramp", "Dozing", "Phone Talk", "Situp with Arms Crossed", "Situp with Cross Legs", "Relax with Arms Crossed", "Eating", "Laze", "Laze with Cross Legs", "Typing with Phone", "Sit with Arm Stretch", "Drink", "Sit with Making Selfie", "Play Game", "Situp Sleep", "Sit Phone Play"],
@@ -174,8 +194,12 @@ Custom actions can be configured in `~/.openclaw/focus-world/skills-config.json`
 }
 ```
 
+When `llm.enabled` is `true`, automatic status sync uses `pickActionWithLLM`. When it is `false`, all automatic status updates use fallback keyword mapping instead. Changes take effect immediately; no restart is required for this file.
+
 ## How It Works
 
-- Plugin automatically syncs status when you are working (tool calls trigger updates)
+- Plugin automatically syncs status when you are working
+- Automatic sync uses LLM only when `llm.enabled` is `true`
+- `focus_set_llm_enabled` updates `~/.openclaw/focus-world/skills-config.json` and takes effect immediately
 - Use `focus_action` to manually perform specific actions on user request
-- Bubble text shows short status (<=5 words)
+- Bubble text shows short status, up to 5 words

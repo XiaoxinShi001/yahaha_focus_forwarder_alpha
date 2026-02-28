@@ -1,36 +1,92 @@
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
 import { parse } from "./src/config.js";
 import { FocusForwarderService } from "./src/service.js";
-import type { FocusForwarderConfig } from "./src/types.js";
+import type { ActionResult, FocusForwarderConfig, PoseType, SkillsConfig } from "./src/types.js";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 // Default actions (fallback when no config file)
-const DEFAULT_ACTIONS = {
+const DEFAULT_ACTIONS: SkillsConfig["actions"] = {
   stand: ["High Five", "Listen Music", "Arms Crossed", "Epiphany", "Yay", "Tired", "Wait"],
   sit: ["Typing with Keyboard", "Thinking", "Study Look At", "Writing", "Hand Cramp", "Laze"],
   lay: ["Rest Chin", "Lie Flat", "Lie Face Down"],
   floor: ["Seiza", "Cross Legged", "Knee Hug"],
 };
 
-const DEFAULT_FALLBACKS = {
+const DEFAULT_FALLBACKS: SkillsConfig["fallbacks"] = {
   done: { poseType: "stand" as const, action: "Yay", bubble: "Done!" },
   thinking: { poseType: "stand" as const, action: "Wait", bubble: "Thinking..." },
   working: { poseType: "stand" as const, action: "Arms Crossed", bubble: "Working" },
 };
 
-type ActionResult = { poseType: "stand" | "sit" | "lay" | "floor"; action: string; bubble: string };
+const DEFAULT_SKILLS_CONFIG: SkillsConfig = {
+  actions: DEFAULT_ACTIONS,
+  fallbacks: DEFAULT_FALLBACKS,
+  llm: { enabled: true },
+};
 
-interface SkillsConfig {
-  actions: typeof DEFAULT_ACTIONS;
-  fallbacks: typeof DEFAULT_FALLBACKS;
-}
-
-const SKILLS_CONFIG_PATH = path.join(process.env.HOME || "~", ".openclaw/focus-world/skills-config.json");
+const FOCUS_WORLD_DIR = path.join(os.homedir(), ".openclaw", "focus-world");
+const SKILLS_CONFIG_PATH = path.join(FOCUS_WORLD_DIR, "skills-config.json");
+const IDENTITY_PATH = path.join(FOCUS_WORLD_DIR, "identity.json");
+const LLM_SESSION_PATH = path.join(FOCUS_WORLD_DIR, "llm-session.json");
 
 let cachedConfig: SkillsConfig | null = null;
 let cachedConfigMtime = 0;
+
+function sanitizeActionResult(value: unknown, fallback: ActionResult): ActionResult {
+  if (!value || typeof value !== "object") return fallback;
+  const candidate = value as Partial<ActionResult>;
+  const poseType = candidate.poseType;
+  const action = candidate.action;
+  const bubble = candidate.bubble;
+  if (!poseType || !["stand", "sit", "lay", "floor"].includes(poseType)) return fallback;
+  if (typeof action !== "string" || !action.trim()) return fallback;
+  return {
+    poseType: poseType as PoseType,
+    action,
+    bubble: typeof bubble === "string" && bubble.trim() ? bubble : fallback.bubble,
+  };
+}
+
+function sanitizeActions(value: unknown, fallback: string[]): string[] {
+  if (!Array.isArray(value)) return fallback;
+  const actions = value.filter((item): item is string => typeof item === "string" && item.trim().length > 0);
+  return actions.length > 0 ? actions : fallback;
+}
+
+function normalizeSkillsConfig(value: unknown): SkillsConfig {
+  const raw = value && typeof value === "object" ? (value as Partial<SkillsConfig>) : {};
+  const actions = raw.actions;
+  const fallbacks = raw.fallbacks;
+  return {
+    actions: {
+      stand: sanitizeActions(actions?.stand, DEFAULT_ACTIONS.stand),
+      sit: sanitizeActions(actions?.sit, DEFAULT_ACTIONS.sit),
+      lay: sanitizeActions(actions?.lay, DEFAULT_ACTIONS.lay),
+      floor: sanitizeActions(actions?.floor, DEFAULT_ACTIONS.floor),
+    },
+    fallbacks: {
+      done: sanitizeActionResult(fallbacks?.done, DEFAULT_FALLBACKS.done),
+      thinking: sanitizeActionResult(fallbacks?.thinking, DEFAULT_FALLBACKS.thinking),
+      working: sanitizeActionResult(fallbacks?.working, DEFAULT_FALLBACKS.working),
+    },
+    llm: {
+      enabled: typeof raw.llm?.enabled === "boolean" ? raw.llm.enabled : DEFAULT_SKILLS_CONFIG.llm.enabled,
+    },
+  };
+}
+
+function updateCachedSkillsConfig(config: SkillsConfig): SkillsConfig {
+  cachedConfig = config;
+  try {
+    cachedConfigMtime = fs.existsSync(SKILLS_CONFIG_PATH) ? fs.statSync(SKILLS_CONFIG_PATH).mtimeMs : 0;
+  } catch {
+    cachedConfigMtime = 0;
+  }
+  return config;
+}
 
 function loadSkillsConfig(): SkillsConfig {
   try {
@@ -38,8 +94,7 @@ function loadSkillsConfig(): SkillsConfig {
       const stat = fs.statSync(SKILLS_CONFIG_PATH);
       if (stat.mtimeMs !== cachedConfigMtime || !cachedConfig) {
         const raw = fs.readFileSync(SKILLS_CONFIG_PATH, "utf-8");
-        cachedConfig = JSON.parse(raw) as SkillsConfig;
-        cachedConfigMtime = stat.mtimeMs;
+        updateCachedSkillsConfig(normalizeSkillsConfig(JSON.parse(raw)));
         pluginApi?.logger.info(`[focus] Loaded skills config`);
       }
       return cachedConfig!;
@@ -47,7 +102,24 @@ function loadSkillsConfig(): SkillsConfig {
   } catch (e) {
     pluginApi?.logger.warn(`[focus] Failed to load skills config: ${e}`);
   }
-  return { actions: DEFAULT_ACTIONS, fallbacks: DEFAULT_FALLBACKS };
+  return updateCachedSkillsConfig(DEFAULT_SKILLS_CONFIG);
+}
+
+function saveSkillsConfig(config: SkillsConfig): SkillsConfig {
+  const normalized = normalizeSkillsConfig(config);
+  fs.mkdirSync(FOCUS_WORLD_DIR, { recursive: true });
+  fs.writeFileSync(SKILLS_CONFIG_PATH, JSON.stringify(normalized, null, 2), "utf-8");
+  pluginApi?.logger.info(`[focus] Saved skills config to ${SKILLS_CONFIG_PATH}`);
+  return updateCachedSkillsConfig(normalized);
+}
+
+function updateSkillsConfig(mutator: (config: SkillsConfig) => SkillsConfig): SkillsConfig {
+  const current = loadSkillsConfig();
+  return saveSkillsConfig(mutator(current));
+}
+
+function isLlmEnabled(): boolean {
+  return loadSkillsConfig().llm.enabled;
 }
 
 let service: FocusForwarderService | null = null;
@@ -105,9 +177,9 @@ async function loadCoreApi() {
 }
 
 // Get done action for a specific poseType
-function getDoneActionForPose(poseType: string): string {
+function getDoneActionForPose(poseType: PoseType): string {
   const config = loadSkillsConfig();
-  const actions = config.actions[poseType as keyof typeof config.actions];
+  const actions = config.actions[poseType];
   // Pick a "done" style action based on poseType
   if (poseType === "stand") return actions.includes("Yay") ? "Yay" : actions[0];
   if (poseType === "sit") return actions.includes("Laze") ? "Laze" : actions[0];
@@ -164,7 +236,7 @@ Return ONLY JSON: {"poseType":"stand|sit|lay|floor","action":"<action name>","bu
     try {
       result = await runEmbeddedPiAgent({
         sessionId: `focus-action-${Date.now()}`,
-        sessionFile: path.join(process.env.HOME || "~", ".openclaw/focus-world/llm-session.json"),
+        sessionFile: LLM_SESSION_PATH,
         workspaceDir: pluginApi?.config?.agents?.defaults?.workspace || process.cwd(),
         config: pluginApi?.config,
         prompt,
@@ -206,18 +278,19 @@ Return ONLY JSON: {"poseType":"stand|sit|lay|floor","action":"<action name>","bu
 interface AgentState {
   pendingLLM: boolean;
   llmCancelled: boolean;
+  llmRequestId: number;
   cooldownStartTime: number;
-  lastLLMResult?: { poseType: string; action: string };
+  lastLLMResult?: { poseType: PoseType; action: string };
 }
 
 const agentStates = new Map<string, AgentState>();
-const SYNC_COOLDOWN_MS = 15000;
 const AGENT_STATE_TTL_MS = 60 * 60 * 1000; // 1 hour TTL for cleanup
+let syncCooldownMs = 15000;
 
 function getAgentState(agentId: string): AgentState {
   let state = agentStates.get(agentId);
   if (!state) {
-    state = { pendingLLM: false, llmCancelled: false, cooldownStartTime: 0 };
+    state = { pendingLLM: false, llmCancelled: false, llmRequestId: 0, cooldownStartTime: 0 };
     agentStates.set(agentId, state);
   }
   return state;
@@ -238,13 +311,32 @@ function truncateLog(text: string, maxLen = 150): string {
   return text.length > maxLen ? text.slice(0, maxLen) + "..." : text;
 }
 
-// 内部 fallback 发送（给 syncStatus 用，不检查 identity）
+function applyLlmEnabledChange(enabled: boolean): SkillsConfig {
+  const nextConfig = updateSkillsConfig((current) => ({
+    ...current,
+    llm: { ...current.llm, enabled },
+  }));
+  for (const state of agentStates.values()) {
+    state.cooldownStartTime = 0;
+    state.pendingLLM = false;
+    if (!enabled) {
+      state.llmCancelled = true;
+      state.llmRequestId += 1;
+    } else {
+      state.llmCancelled = false;
+    }
+  }
+  return nextConfig;
+}
+
+// Internal fallback sender used by syncStatus without repeating identity checks.
 function sendFallbackInternal(context: string, agentId: string) {
   if (!service?.isConnected()) return;
   const state = getAgentState(agentId);
   const fallback = pickActionFallback(context);
-  const poseType = state.lastLLMResult?.poseType || fallback.poseType;
-  const action = state.lastLLMResult?.action || fallback.action;
+  const reuseLastLlmResult = isLlmEnabled();
+  const poseType = reuseLastLlmResult ? state.lastLLMResult?.poseType || fallback.poseType : fallback.poseType;
+  const action = reuseLastLlmResult ? state.lastLLMResult?.action || fallback.action : fallback.action;
   service.sendStatus(poseType, action, fallback.bubble || "Working", truncateLog(context));
 }
 
@@ -257,9 +349,16 @@ function syncStatus(context: string, agentId: string) {
   const state = getAgentState(agentId);
   const now = Date.now();
   const elapsed = now - state.cooldownStartTime;
-  const inCooldown = state.cooldownStartTime > 0 && elapsed < SYNC_COOLDOWN_MS;
+  const inCooldown = state.cooldownStartTime > 0 && elapsed < syncCooldownMs;
+  const llmEnabled = isLlmEnabled();
   
-  pluginApi?.logger.info(`[focus] syncStatus: agent=${agentId} elapsed=${elapsed}ms inCooldown=${inCooldown} pendingLLM=${state.pendingLLM}`);
+  pluginApi?.logger.info(`[focus] syncStatus: agent=${agentId} elapsed=${elapsed}ms inCooldown=${inCooldown} pendingLLM=${state.pendingLLM} llmEnabled=${llmEnabled}`);
+
+  if (!llmEnabled) {
+    pluginApi?.logger.info(`[focus] LLM disabled, using fallback mapping for agent ${agentId}`);
+    sendFallbackInternal(context, agentId);
+    return;
+  }
   
   // In cooldown OR LLM pending: send fallback
   if (inCooldown || state.pendingLLM) {
@@ -272,13 +371,15 @@ function syncStatus(context: string, agentId: string) {
   state.cooldownStartTime = now;
   state.pendingLLM = true;
   state.llmCancelled = false;
+  const requestId = state.llmRequestId + 1;
+  state.llmRequestId = requestId;
   pluginApi?.logger.info(`[focus] calling LLM for agent ${agentId}`);
   
   pickActionWithLLM(context)
     .then((action) => {
       state.pendingLLM = false;
-      if (state.llmCancelled) {
-        pluginApi?.logger.debug(`[focus] LLM result discarded (cancelled) for agent ${agentId}`);
+      if (state.llmCancelled || state.llmRequestId !== requestId || !isLlmEnabled()) {
+        pluginApi?.logger.debug(`[focus] LLM result discarded for agent ${agentId}`);
         return;
       }
       state.lastLLMResult = { poseType: action.poseType, action: action.action };
@@ -303,6 +404,7 @@ const plugin = {
       id: "focus-forwarder",
       start: (ctx) => {
         const cfg = parse(ctx.config.plugins?.entries?.["focus-forwarder"]?.config) as FocusForwarderConfig;
+        syncCooldownMs = cfg.cooldownMs;
         service = new FocusForwarderService(cfg, api.logger);
         return service.start();
       },
@@ -318,10 +420,9 @@ const plugin = {
         required: ["userId"],
       },
       execute: async (_toolCallId, params) => {
-        const identityPath = path.join(process.env.HOME || "~", ".openclaw/focus-world/identity.json");
         let userId = (params as any)?.userId;
         if (!userId) {
-          try { userId = JSON.parse(fs.readFileSync(identityPath, "utf-8")).userId; } catch {}
+          try { userId = JSON.parse(fs.readFileSync(IDENTITY_PATH, "utf-8")).userId; } catch {}
         }
         if (!userId) return { success: false, error: "No userId" };
         const result = await service?.join(userId);
@@ -366,17 +467,53 @@ const plugin = {
         if (!config?.actions?.stand || !config?.actions?.sit || !config?.actions?.lay || !config?.actions?.floor) {
           return { success: false, error: "Invalid skills config" };
         }
+        const normalizedPoseType = poseType as PoseType;
         // Validate action exists in the specified poseType
-        const poseActions = config.actions[poseType as keyof typeof config.actions];
+        const poseActions = config.actions[normalizedPoseType];
         const matched = poseActions.find((a: string) => a.toLowerCase() === action.toLowerCase());
         if (!matched) {
           return { success: false, error: `Unknown action "${action}" for poseType "${poseType}"`, available: poseActions };
         }
         // Update lastLLMResult for main agent
         const state = getAgentState("main");
-        state.lastLLMResult = { poseType, action: matched };
-        service.sendStatus(poseType, matched, bubble || matched, `User requested: ${action}`);
-        return { success: true, poseType, action: matched, bubble: bubble || matched };
+        state.lastLLMResult = { poseType: normalizedPoseType, action: matched };
+        service.sendStatus(normalizedPoseType, matched, bubble || matched, `User requested: ${action}`);
+        return { success: true, poseType: normalizedPoseType, action: matched, bubble: bubble || matched };
+      },
+    });
+
+    api.registerTool({
+      name: "focus_set_llm_enabled",
+      description: "Enable or disable Focus Forwarder LLM requests for automatic status syncing. Use this when the user asks to stop or resume LLM-based action picking for Focus Forwarder.",
+      parameters: {
+        type: "object",
+        properties: {
+          enabled: { type: "boolean", description: "True to enable LLM-based auto action picking, false to use fallback keyword mapping only." },
+        },
+        required: ["enabled"],
+      },
+      execute: async (_toolCallId, params) => {
+        const enabled = (params as { enabled?: unknown } | null)?.enabled;
+        if (typeof enabled !== "boolean") {
+          return { success: false, error: "enabled must be a boolean" };
+        }
+        try {
+          const nextConfig = applyLlmEnabledChange(enabled);
+          return {
+            success: true,
+            llmEnabled: nextConfig.llm.enabled,
+            configPath: SKILLS_CONFIG_PATH,
+            message: nextConfig.llm.enabled
+              ? "Focus Forwarder LLM requests enabled"
+              : "Focus Forwarder LLM requests disabled; fallback mapping is now active",
+          };
+        } catch (error) {
+          return {
+            success: false,
+            error: `Failed to update skills config: ${error}`,
+            configPath: SKILLS_CONFIG_PATH,
+          };
+        }
       },
     });
 
@@ -414,13 +551,17 @@ const plugin = {
     });
     api.on("agent_end", (event: any, ctx?: { agentId?: string; sessionKey?: string }) => {
       const agentId = ctx?.agentId || ctx?.sessionKey || "main";
-      // 不再 cancel pending LLM，让结果正常发送
       // Use last LLM poseType but pick done action for that pose
       if (!service?.hasValidIdentity() || !service?.isConnected()) return;
       const state = getAgentState(agentId);
-      const poseType = state.lastLLMResult?.poseType || "stand";
-      const action = getDoneActionForPose(poseType);
-      service.sendStatus(poseType, action, "Done!", truncateLog(`[${agentId}] Task complete`));
+      if (!isLlmEnabled()) {
+        const done = pickActionFallback(`[${agentId}] done`);
+        service.sendStatus(done.poseType, done.action, done.bubble || "Done!", truncateLog(`[${agentId}] Task complete`));
+      } else {
+        const poseType = state.lastLLMResult?.poseType || "stand";
+        const action = getDoneActionForPose(poseType);
+        service.sendStatus(poseType, action, "Done!", truncateLog(`[${agentId}] Task complete`));
+      }
       cleanupStaleAgents();
     });
   },

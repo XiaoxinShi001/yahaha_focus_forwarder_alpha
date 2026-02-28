@@ -1,10 +1,11 @@
 import WebSocket from "ws";
 import * as fs from "fs";
+import os from "node:os";
 import * as path from "path";
 import type { Logger } from "openclaw/plugin-sdk";
 import type { FocusForwarderConfig, FocusIdentity, StatusPayload } from "./types.js";
 
-const IDENTITY_DIR = path.join(process.env.HOME || "~", ".openclaw/focus-world");
+const IDENTITY_DIR = path.join(os.homedir(), ".openclaw", "focus-world");
 const IDENTITY_PATH = path.join(IDENTITY_DIR, "identity.json");
 
 export class FocusForwarderService {
@@ -50,7 +51,7 @@ export class FocusForwarderService {
     this.ws = new WebSocket(this.config.wsUrl);
     this.ws.on("open", () => {
       this.logger.info(`Connected to ${this.config.wsUrl}`);
-      // 如果有有效 identity，自动发送 rejoin
+      // Automatically send rejoin when a valid identity is available.
       if (this.identity?.userId && this.identity?.authKey) {
         this.ws?.send(JSON.stringify({ type: "rejoin", userId: this.identity.userId, authKey: this.identity.authKey }));
         this.logger.info(`Sent rejoin for ${this.identity.userId}`);
@@ -114,22 +115,16 @@ export class FocusForwarderService {
 
   sendStatus(poseType: string, action: string, bubble: string, log: string): void {
     if (!this.identity?.authKey || this.ws?.readyState !== WebSocket.OPEN) return;
-    // Build actions object with the active pose
-    const actions = {
-      stand: poseType === "stand" ? action : "",
-      sit: poseType === "sit" ? action : "",
-      lay: poseType === "lay" ? action : "",
-      floor: poseType === "floor" ? action : "",
-    };
-    this.ws.send(JSON.stringify({ 
+    const payload: StatusPayload = {
       type: "status", 
       userId: this.identity.userId, 
       authKey: this.identity.authKey, 
       poseType,
-      actions, 
+      action,
       bubble, 
       log 
-    }));
+    };
+    this.ws.send(JSON.stringify(payload));
   }
 
   isConnected(): boolean { return this.ws?.readyState === WebSocket.OPEN && !!this.identity?.authKey; }

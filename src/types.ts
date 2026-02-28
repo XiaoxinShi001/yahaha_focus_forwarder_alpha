@@ -4,6 +4,26 @@ export type FocusForwarderConfig = {
   cooldownMs: number;
 };
 
+export type PoseType = "stand" | "sit" | "lay" | "floor";
+
+export type ActionResult = {
+  poseType: PoseType;
+  action: string;
+  bubble: string;
+};
+
+export type SkillsConfig = {
+  actions: Record<PoseType, string[]>;
+  fallbacks: {
+    done: ActionResult;
+    thinking: ActionResult;
+    working: ActionResult;
+  };
+  llm: {
+    enabled: boolean;
+  };
+};
+
 export type FocusIdentity = {
   userId: string;
   authKey?: string;
@@ -29,12 +49,8 @@ export type StatusPayload = {
   type: "status";
   userId: string;
   authKey: string;
-  actions: {
-    stand: string;
-    sit: string;
-    lay: string;
-    floor: string;
-  };
+  poseType: PoseType;
+  action: string;
   bubble: string;
   log: string;
 };
