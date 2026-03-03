@@ -410,24 +410,47 @@ const plugin = {
 
     api.registerTool({
       name: "focus_join",
-      description: "Join Focus world with userId",
+      description: "Join Focus world with mateId, the current OpenClaw name, and a short self-description",
       parameters: {
         type: "object",
         properties: {
-          userId: { type: "string", description: "User ID to join Focus world" },
+          mateId: { type: "string", description: "Mate ID to join Focus world" },
+          openclawName: {
+            type: "string",
+            description: "Current OpenClaw name to include in the join message",
+          },
+          openclawDescription: {
+            type: "string",
+            description: "Short self-description covering OpenClaw personality and role",
+          },
         },
+        required: ["openclawName", "openclawDescription"],
       },
       execute: async (_toolCallId, params) => {
-        let userId = (params as { userId?: string } | null)?.userId;
-        if (!userId) {
+        let mateId = (params as { mateId?: string } | null)?.mateId;
+        const openclawName = (params as { openclawName?: string } | null)?.openclawName?.trim();
+        const openclawDescription = (
+          params as { openclawDescription?: string } | null
+        )?.openclawDescription?.trim();
+        if (!mateId) {
           try {
-            userId = JSON.parse(fs.readFileSync(IDENTITY_PATH, "utf-8")).userId;
+            const identity = JSON.parse(fs.readFileSync(IDENTITY_PATH, "utf-8")) as {
+              mateId?: string;
+              userId?: string;
+            };
+            mateId = identity.mateId ?? identity.userId;
           } catch {}
         }
-        if (!userId) {
-          return { success: false, error: "No userId" };
+        if (!mateId) {
+          return { success: false, error: "No mateId" };
         }
-        const result = await service?.join(userId);
+        if (!openclawName) {
+          return { success: false, error: "No openclawName" };
+        }
+        if (!openclawDescription) {
+          return { success: false, error: "No openclawDescription" };
+        }
+        const result = await service?.join(mateId, openclawName, openclawDescription);
         return result ? { success: true, authKey: result } : { success: false, error: "Failed" };
       },
     });

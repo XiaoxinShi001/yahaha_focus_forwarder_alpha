@@ -32,11 +32,16 @@ export class FocusForwarderService {
     this.ws = null;
   }
 
-  async join(userId: string): Promise<string | null> {
+  async join(
+    mateId: string,
+    openclawName: string,
+    openclawDescription: string,
+  ): Promise<string | null> {
     return new Promise((resolve) => {
-      this.identity = { userId };
+      this.identity = { mateId };
       this.joinResolve = resolve;
-      const sendJoin = () => this.ws?.send(JSON.stringify({ type: "join", userId }));
+      const sendJoin = () =>
+        this.ws?.send(JSON.stringify({ type: "join", mateId, openclawName, openclawDescription }));
       if (this.ws?.readyState === WebSocket.OPEN) {
         sendJoin();
       } else {
@@ -52,9 +57,11 @@ export class FocusForwarderService {
     this.ws.on("open", () => {
       this.logger.info(`Connected to ${this.config.wsUrl}`);
       // Automatically send rejoin when a valid identity is available.
-      if (this.identity?.userId && this.identity?.authKey) {
-        this.ws?.send(JSON.stringify({ type: "rejoin", userId: this.identity.userId, authKey: this.identity.authKey }));
-        this.logger.debug(`Sent rejoin for ${this.identity.userId}`);
+      if (this.identity?.mateId && this.identity?.authKey) {
+        this.ws?.send(
+          JSON.stringify({ type: "rejoin", mateId: this.identity.mateId, authKey: this.identity.authKey }),
+        );
+        this.logger.debug(`Sent rejoin for ${this.identity.mateId}`);
       }
     });
     this.ws.on("message", (data) => this.handleMessage(data.toString()));
@@ -68,7 +75,7 @@ export class FocusForwarderService {
       if (msg.type === "join_ack" && msg.authKey && this.identity) {
         this.identity.authKey = msg.authKey;
         this.saveIdentity();
-        this.logger.info(`Joined as ${this.identity.userId}`);
+        this.logger.info(`Joined as ${this.identity.mateId}`);
         this.joinResolve?.(msg.authKey);
         this.joinResolve = null;
       } else if (msg.type === "rejoin_failed" || msg.type === "auth_error") {
@@ -88,8 +95,19 @@ export class FocusForwarderService {
       if (!fs.existsSync(IDENTITY_PATH)) return null;
       const data = JSON.parse(fs.readFileSync(IDENTITY_PATH, "utf-8"));
       // Validate required fields
-      if (!data.userId || typeof data.userId !== "string") return null;
-      return data;
+      const mateId =
+        typeof data.mateId === "string" && data.mateId
+          ? data.mateId
+          : typeof data.userId === "string" && data.userId
+            ? data.userId
+            : null;
+      if (mateId) {
+        return {
+          mateId,
+          authKey: typeof data.authKey === "string" ? data.authKey : undefined,
+        };
+      }
+      return null;
     } catch (e) {
       this.logger.warn(`Failed to load identity: ${e}`);
       return null;
@@ -97,7 +115,7 @@ export class FocusForwarderService {
   }
 
   private saveIdentity(): void {
-    if (!this.identity?.userId) return;
+    if (!this.identity?.mateId) return;
     try {
       if (!fs.existsSync(IDENTITY_DIR)) fs.mkdirSync(IDENTITY_DIR, { recursive: true, mode: 0o700 });
       fs.writeFileSync(IDENTITY_PATH, JSON.stringify(this.identity, null, 2), { mode: 0o600 });
@@ -117,7 +135,7 @@ export class FocusForwarderService {
     if (!this.identity?.authKey || this.ws?.readyState !== WebSocket.OPEN) return;
     const payload: StatusPayload = {
       type: "status", 
-      userId: this.identity.userId, 
+      mateId: this.identity.mateId, 
       authKey: this.identity.authKey, 
       poseType,
       action,
@@ -129,10 +147,10 @@ export class FocusForwarderService {
 
   isConnected(): boolean { return this.ws?.readyState === WebSocket.OPEN && !!this.identity?.authKey; }
 
-  hasValidIdentity(): boolean { return !!this.identity?.userId && !!this.identity?.authKey; }
+  hasValidIdentity(): boolean { return !!this.identity?.mateId && !!this.identity?.authKey; }
 
   async leave(): Promise<boolean> {
-    if (!this.identity?.userId || !this.identity?.authKey || this.ws?.readyState !== WebSocket.OPEN) return false;
+    if (!this.identity?.mateId || !this.identity?.authKey || this.ws?.readyState !== WebSocket.OPEN) return false;
     return new Promise((resolve) => {
       const handler = (data: WebSocket.Data) => {
         try {
@@ -147,7 +165,9 @@ export class FocusForwarderService {
         }
       };
       this.ws!.on("message", handler);
-      this.ws!.send(JSON.stringify({ type: "leave", userId: this.identity!.userId, authKey: this.identity!.authKey }));
+      this.ws!.send(
+        JSON.stringify({ type: "leave", mateId: this.identity!.mateId, authKey: this.identity!.authKey }),
+      );
       setTimeout(() => { this.ws?.off("message", handler); resolve(false); }, 10000);
     });
   }

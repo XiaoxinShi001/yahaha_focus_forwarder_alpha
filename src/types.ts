@@ -19,13 +19,15 @@ export type SkillsConfig = {
 };
 
 export type FocusIdentity = {
-  userId: string;
+  mateId: string;
   authKey?: string;
 };
 
 export type JoinPayload = {
   type: "join";
-  userId: string;
+  mateId: string;
+  openclawName: string;
+  openclawDescription: string;
 };
 
 export type JoinAckPayload = {
@@ -35,13 +37,13 @@ export type JoinAckPayload = {
 
 export type LeavePayload = {
   type: "leave";
-  userId: string;
+  mateId: string;
   authKey: string;
 };
 
 export type StatusPayload = {
   type: "status";
-  userId: string;
+  mateId: string;
   authKey: string;
   poseType: PoseType;
   action: string;

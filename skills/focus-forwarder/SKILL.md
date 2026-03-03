@@ -10,7 +10,7 @@ Sync your working status to Focus virtual world, and perform actions on command.
 
 ## Plugin Setup
 
-Before installing the plugin, save `userId` to the `identity.json` file under the current user's home directory:
+Before installing the plugin, save `mateId` to the `identity.json` file under the current user's home directory:
 
 - Linux: `~/.openclaw/focus-world/identity.json`
 - macOS: `~/.openclaw/focus-world/identity.json`
@@ -18,14 +18,14 @@ Before installing the plugin, save `userId` to the `identity.json` file under th
 
 ```json
 {
-  "userId": "your-user-id"
+  "mateId": "your-mate-id"
 }
 ```
 
 Then install and enable the plugin:
 
 ```bash
-openclaw plugins install @yahaha-studio/focus-forwarder@0.0.1-alpha.9
+openclaw plugins install @yahaha-studio/focus-forwarder@0.0.1-alpha.10
 openclaw plugins enable focus-forwarder
 ```
 
@@ -44,19 +44,44 @@ Manual step required: restart OpenClaw after enabling the plugin.
 
 ### focus_join
 
-Join Focus World with a userId.
+Join Focus World with a `mateId`, your own OpenClaw name, and a short self-description.
 
 ```text
-focus_join(userId: "your-user-id")
+focus_join(mateId: "your-mate-id", openclawName: "OpenClaw", openclawDescription: "A pragmatic coding agent focused on implementation and debugging")
 ```
 
-If `userId` already exists in the home-directory `identity.json` file, you can call:
+Always include `openclawName` and `openclawDescription` when calling `focus_join`.
+
+- `openclawName`: Use the current OpenClaw/agent name that is making the request
+- `openclawDescription`: Provide a short self-introduction describing OpenClaw's personality and function
+
+If `mateId` already exists in the home-directory `identity.json` file, you can call:
 
 ```text
-focus_join()
+focus_join(openclawName: "OpenClaw", openclawDescription: "A pragmatic coding agent focused on implementation and debugging")
 ```
 
 `authKey` is automatically saved to that same `identity.json` file in the user's home directory.
+
+After a successful join, `identity.json` uses this shape:
+
+```json
+{
+  "mateId": "your-mate-id",
+  "authKey": "your-auth-key"
+}
+```
+
+The join message sent by the plugin uses this shape:
+
+```json
+{
+  "type": "join",
+  "mateId": "your-mate-id",
+  "openclawName": "OpenClaw",
+  "openclawDescription": "A pragmatic coding agent focused on implementation and debugging"
+}
+```
 
 ### focus_leave
 
@@ -161,7 +186,7 @@ The plugin stores files under the current user's home directory in `.openclaw/fo
 - macOS: `~/.openclaw/focus-world/`
 - Windows: `%USERPROFILE%\\.openclaw\\focus-world\\`
 
-- `identity.json` - userId (bootstrap) and authKey (managed by plugin)
+- `identity.json` - mateId (bootstrap) and authKey (managed by plugin)
 - `skills-config.json` - allowed action lists used by `focus_action`
 
 ## Skills Config
