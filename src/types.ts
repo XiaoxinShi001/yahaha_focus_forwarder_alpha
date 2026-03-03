@@ -50,3 +50,54 @@ export type StatusPayload = {
   bubble: string;
   log: string;
 };
+
+export type ClockAction = "set" | "stop" | "pause" | "resume" | "nextSession";
+
+export type ClockMode = "pomodoro" | "countDown" | "countUp";
+
+export type PomodoroPhase = "focusing" | "shortBreak" | "longBreak";
+
+export type PomodoroClock = {
+  mode: "pomodoro";
+  running: boolean;
+  focusSeconds: number;
+  shortBreakSeconds: number;
+  longBreakSeconds: number;
+  sessionCount: number;
+  currentSession: number;
+  phase: PomodoroPhase;
+  remainingSeconds: number;
+};
+
+export type CountDownClock = {
+  mode: "countDown";
+  running: boolean;
+  durationSeconds: number;
+  remainingSeconds: number;
+};
+
+export type CountUpClock = {
+  mode: "countUp";
+  running: boolean;
+  elapsedSeconds: number;
+};
+
+export type ClockConfig = PomodoroClock | CountDownClock | CountUpClock;
+
+type ClockPayloadBase = {
+  type: "clock";
+  mateId: string;
+  authKey: string;
+  requestId?: string;
+};
+
+export type ClockSetPayload = ClockPayloadBase & {
+  action: "set";
+  clock: ClockConfig;
+};
+
+export type ClockControlPayload = ClockPayloadBase & {
+  action: Exclude<ClockAction, "set">;
+};
+
+export type ClockPayload = ClockSetPayload | ClockControlPayload;

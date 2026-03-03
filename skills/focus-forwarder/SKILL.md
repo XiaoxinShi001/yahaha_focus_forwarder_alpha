@@ -25,7 +25,7 @@ Before installing the plugin, save `mateId` to the `identity.json` file under th
 Then install and enable the plugin:
 
 ```bash
-openclaw plugins install @yahaha-studio/focus-forwarder@0.0.1-alpha.10
+openclaw plugins install @yahaha-studio/focus-forwarder@0.0.1-alpha.11
 openclaw plugins enable focus-forwarder
 ```
 
@@ -93,7 +93,7 @@ focus_leave()
 
 ### focus_action
 
-Send an action or pose to Focus World. Use this when a user asks you to do something in Focus, for example "dance", "wave", or "sit and type". The plugin also injects prompt guidance so OpenClaw uses this tool to sync task lifecycle status to Focus App.
+Send an action or pose to Focus World. Use this when a user asks you to do something in Focus, for example "dance", "wave", or "sit and type". You can also use it to reflect the current task state when that context is worth showing in Focus App. Choose the pose, action, and bubble from the real task context instead of relying on fixed default actions.
 
 ```text
 focus_action(poseType: "stand", action: "Yay", bubble: "Dancing!")
@@ -103,6 +103,30 @@ Parameters:
 - `poseType` (required): `stand`, `sit`, `lay`, or `floor`
 - `action` (required): Action name to perform
 - `bubble` (optional): Bubble text to display, max 5 words
+
+### focus_clock
+
+Send a clock command to Focus World. Use this only when you judge it useful to annotate the current task's duration or timing mode.
+
+```text
+focus_clock(action: "set", clock: { mode: "pomodoro", focusSeconds: 1500, shortBreakSeconds: 300, longBreakSeconds: 900, sessionCount: 4 })
+```
+
+Parameters:
+- `action` (required): `set`, `stop`, `pause`, `resume`, or `nextSession`
+- `requestId` (optional): Request identifier for tracing or deduplication
+- `clock` (required when `action="set"`): Clock definition for one of these modes:
+
+Clock modes:
+- `pomodoro`: Supports `focusSeconds`, `shortBreakSeconds`, `longBreakSeconds`, `sessionCount`, optional `currentSession`, optional `phase`, optional `remainingSeconds`, optional `running`
+- `countDown`: Supports `durationSeconds`, optional `remainingSeconds`, optional `running`
+- `countUp`: Supports optional `elapsedSeconds`, optional `running`
+
+Examples:
+- Pomodoro: `focus_clock(action: "set", clock: { mode: "pomodoro", focusSeconds: 1500, shortBreakSeconds: 300, longBreakSeconds: 900, sessionCount: 4 })`
+- Countdown: `focus_clock(action: "set", clock: { mode: "countDown", durationSeconds: 1500 })`
+- Count up: `focus_clock(action: "set", clock: { mode: "countUp" })`
+- Stop: `focus_clock(action: "stop")`
 
 ## Available Actions
 
@@ -207,6 +231,8 @@ Custom actions can be configured in the home-directory `skills-config.json` file
 ## How It Works
 
 - When Focus World is connected, the plugin injects prompt instructions before agent runs
-- The injected prompt tells OpenClaw to call `focus_action` before work starts, during active execution, and again when the task is complete
-- Use `focus_action` to manually perform specific actions on user request
+- The injected prompt tells OpenClaw that `focus_action` is available for contextual status sync, but does not hardcode any specific action choice
+- The injected prompt also tells OpenClaw that `focus_clock` is optional and should only be used when timing information is useful for the current task
+- Use `focus_action` to manually perform specific actions on user request or to reflect meaningful task-state changes
+- Use `focus_clock` to mark task duration with pomodoro, countdown, or count-up when that timing signal is useful
 - Bubble text shows short status, up to 5 words

@@ -5,7 +5,15 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
 import { parse } from "./src/config.js";
 import { FocusForwarderService } from "./src/service.js";
-import type { ActionResult, FocusForwarderConfig, PoseType, SkillsConfig } from "./src/types.js";
+import type {
+  ActionResult,
+  ClockAction,
+  ClockConfig,
+  FocusForwarderConfig,
+  PomodoroPhase,
+  PoseType,
+  SkillsConfig,
+} from "./src/types.js";
 
 const DEFAULT_ACTIONS: SkillsConfig["actions"] = {
   stand: ["High Five", "Listen Music", "Arms Crossed", "Epiphany", "Yay", "Tired", "Wait"],
@@ -169,6 +177,141 @@ function truncateLog(text: string, maxLen = 150): string {
   return text.length > maxLen ? `${text.slice(0, maxLen)}...` : text;
 }
 
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+function isNonNegativeInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0;
+}
+
+function isPositiveInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value > 0;
+}
+
+function isClockAction(value: unknown): value is ClockAction {
+  return ["set", "stop", "pause", "resume", "nextSession"].includes(String(value));
+}
+
+function isPomodoroPhase(value: unknown): value is PomodoroPhase {
+  return ["focusing", "shortBreak", "longBreak"].includes(String(value));
+}
+
+function getPomodoroPhaseDuration(
+  phase: PomodoroPhase,
+  focusSeconds: number,
+  shortBreakSeconds: number,
+  longBreakSeconds: number,
+): number {
+  if (phase === "shortBreak") {
+    return shortBreakSeconds;
+  }
+  if (phase === "longBreak") {
+    return longBreakSeconds;
+  }
+  return focusSeconds;
+}
+
+function normalizeClockConfig(value: unknown): { clock?: ClockConfig; error?: string } {
+  if (!isPlainObject(value)) {
+    return { error: "clock must be an object" };
+  }
+
+  const mode = value.mode;
+  if (!["pomodoro", "countDown", "countUp"].includes(String(mode))) {
+    return { error: "clock.mode must be pomodoro, countDown, or countUp" };
+  }
+
+  const running = typeof value.running === "boolean" ? value.running : true;
+
+  if (mode === "pomodoro") {
+    const focusSeconds = value.focusSeconds;
+    const shortBreakSeconds = value.shortBreakSeconds;
+    const longBreakSeconds = value.longBreakSeconds;
+    const sessionCount = value.sessionCount;
+    const currentSession = value.currentSession ?? 1;
+    const phase = value.phase ?? "focusing";
+
+    if (!isPositiveInteger(focusSeconds)) {
+      return { error: "clock.focusSeconds must be a positive integer" };
+    }
+    if (!isPositiveInteger(shortBreakSeconds)) {
+      return { error: "clock.shortBreakSeconds must be a positive integer" };
+    }
+    if (!isPositiveInteger(longBreakSeconds)) {
+      return { error: "clock.longBreakSeconds must be a positive integer" };
+    }
+    if (!isPositiveInteger(sessionCount)) {
+      return { error: "clock.sessionCount must be a positive integer" };
+    }
+    if (!isPositiveInteger(currentSession)) {
+      return { error: "clock.currentSession must be a positive integer" };
+    }
+    if (currentSession > sessionCount) {
+      return { error: "clock.currentSession cannot be greater than clock.sessionCount" };
+    }
+    if (!isPomodoroPhase(phase)) {
+      return { error: "clock.phase must be focusing, shortBreak, or longBreak" };
+    }
+
+    const defaultRemainingSeconds = getPomodoroPhaseDuration(
+      phase,
+      focusSeconds,
+      shortBreakSeconds,
+      longBreakSeconds,
+    );
+    const remainingSeconds = value.remainingSeconds ?? defaultRemainingSeconds;
+    if (!isNonNegativeInteger(remainingSeconds)) {
+      return { error: "clock.remainingSeconds must be a non-negative integer" };
+    }
+
+    return {
+      clock: {
+        mode: "pomodoro",
+        running,
+        focusSeconds,
+        shortBreakSeconds,
+        longBreakSeconds,
+        sessionCount,
+        currentSession,
+        phase,
+        remainingSeconds,
+      },
+    };
+  }
+
+  if (mode === "countDown") {
+    const durationSeconds = value.durationSeconds;
+    if (!isPositiveInteger(durationSeconds)) {
+      return { error: "clock.durationSeconds must be a positive integer" };
+    }
+    const remainingSeconds = value.remainingSeconds ?? durationSeconds;
+    if (!isNonNegativeInteger(remainingSeconds)) {
+      return { error: "clock.remainingSeconds must be a non-negative integer" };
+    }
+    return {
+      clock: {
+        mode: "countDown",
+        running,
+        durationSeconds,
+        remainingSeconds,
+      },
+    };
+  }
+
+  const elapsedSeconds = value.elapsedSeconds ?? 0;
+  if (!isNonNegativeInteger(elapsedSeconds)) {
+    return { error: "clock.elapsedSeconds must be a non-negative integer" };
+  }
+  return {
+    clock: {
+      mode: "countUp",
+      running,
+      elapsedSeconds,
+    },
+  };
+}
+
 function pickRandomAction(actions: string[]): string {
   return actions[Math.floor(Math.random() * actions.length)];
 }
@@ -329,62 +472,18 @@ Return ONLY JSON: {"poseType":"stand|sit|lay|floor","action":"<action name>","bu
   }
 }
 
-function pickPreferredAction(poseType: PoseType, preferred: string[]): string {
-  const actions = loadSkillsConfig().actions[poseType];
-  for (const candidate of preferred) {
-    const matched = actions.find((action) => action.toLowerCase() === candidate.toLowerCase());
-    if (matched) {
-      return matched;
-    }
-  }
-  return actions[0];
-}
-
-function buildLifecycleStatus(
-  poseType: PoseType,
-  preferred: string[],
-  bubble: string,
-): ActionResult {
-  return {
-    poseType,
-    action: pickPreferredAction(poseType, preferred),
-    bubble,
-  };
-}
-
-function resolveLifecycleStatuses(): {
-  start: ActionResult;
-  working: ActionResult;
-  done: ActionResult;
-} {
-  return {
-    start: buildLifecycleStatus("stand", ["Wait", "Arms Crossed", "Epiphany"], "Starting"),
-    working: buildLifecycleStatus(
-      "sit",
-      ["Typing with Keyboard", "Writing", "Thinking", "Study Look At"],
-      "Working",
-    ),
-    done: buildLifecycleStatus("stand", ["Yay", "High Five", "Epiphany"], "Done!"),
-  };
-}
-
-function formatFocusActionCall(status: ActionResult): string {
-  return `focus_action(poseType: "${status.poseType}", action: "${status.action}", bubble: "${status.bubble}")`;
-}
-
 function buildFocusPrompt(): string {
-  const { start, working, done } = resolveLifecycleStatuses();
   return [
-    "Focus App status sync is mandatory for substantive work in this turn.",
-    "Use the `focus_action` tool to sync your task lifecycle to Focus App.",
-    `- Before starting the task or before your first non-Focus tool call, call ${formatFocusActionCall(start)}.`,
-    `- When active execution begins, call ${formatFocusActionCall(working)} once for the working phase.`,
-    `- After the task is complete and immediately before your final user-visible reply, call ${formatFocusActionCall(done)}.`,
+    "Focus App status sync is available for substantive work in this turn.",
+    "Use `focus_action` when it is useful to reflect your current task state in Focus App.",
+    "Choose the poseType, action, and bubble from the actual task context. Do not rely on fixed default actions from this prompt.",
     "Rules:",
-    "- Do not spam `focus_action` on every tool call; once per phase per turn is enough.",
-    "- If the user explicitly asks for a different Focus pose/action, follow the user's request instead of the default phase action.",
-    "- Skip the lifecycle sync only if the user explicitly says not to sync Focus, or if `focus_action` already failed in this turn.",
-    "- Do not add lifecycle sync calls when the task itself is only about `focus_join`, `focus_leave`, or a standalone `focus_action` request.",
+    "- Use `focus_action` sparingly. Only send meaningful status changes, not every tool call.",
+    "- If the user explicitly asks for a specific Focus pose or action, follow the user's request.",
+    "- If the user explicitly says not to sync Focus, skip Focus tool calls.",
+    "- Use `focus_clock` only when you judge it helpful to mark or communicate the duration of the current task.",
+    "- `focus_clock` is optional. Prefer it for timing-oriented work such as countdowns, count-up tracking, or pomodoro sessions.",
+    "- Do not add automatic Focus sync when the task itself is only about `focus_join`, `focus_leave`, `focus_action`, or `focus_clock`.",
   ].join("\n");
 }
 
@@ -518,6 +617,118 @@ const plugin = {
           poseType: normalizedPoseType,
           action: matched,
           bubble: bubbleText,
+        };
+      },
+    });
+
+    api.registerTool({
+      name: "focus_clock",
+      description:
+        "Send clock commands to Focus world, including pomodoro, countdown, count-up, stop, pause, resume, and nextSession.",
+      parameters: {
+        type: "object",
+        properties: {
+          action: {
+            type: "string",
+            description: "Clock action: set, stop, pause, resume, or nextSession",
+          },
+          requestId: {
+            type: "string",
+            description: "Optional request ID for server-side tracing or deduplication",
+          },
+          clock: {
+            type: "object",
+            description: "Required when action=set. Defines the pomodoro, countDown, or countUp clock payload.",
+            properties: {
+              mode: {
+                type: "string",
+                description: "Clock mode: pomodoro, countDown, or countUp",
+              },
+              running: {
+                type: "boolean",
+                description: "Optional running state. Defaults to true.",
+              },
+              focusSeconds: {
+                type: "number",
+                description: "Pomodoro focus duration in seconds",
+              },
+              shortBreakSeconds: {
+                type: "number",
+                description: "Pomodoro short break duration in seconds",
+              },
+              longBreakSeconds: {
+                type: "number",
+                description: "Pomodoro long break duration in seconds",
+              },
+              sessionCount: {
+                type: "number",
+                description: "Pomodoro total focus sessions before long break",
+              },
+              currentSession: {
+                type: "number",
+                description: "Pomodoro current session number. Defaults to 1.",
+              },
+              phase: {
+                type: "string",
+                description: "Pomodoro phase: focusing, shortBreak, or longBreak",
+              },
+              durationSeconds: {
+                type: "number",
+                description: "Countdown duration in seconds",
+              },
+              remainingSeconds: {
+                type: "number",
+                description: "Optional remaining seconds for pomodoro/countDown",
+              },
+              elapsedSeconds: {
+                type: "number",
+                description: "Optional elapsed seconds for countUp. Defaults to 0.",
+              },
+            },
+          },
+        },
+        required: ["action"],
+      },
+      execute: async (_toolCallId, params) => {
+        const { action, requestId, clock } = (params || {}) as {
+          action?: unknown;
+          requestId?: unknown;
+          clock?: unknown;
+        };
+
+        if (!isClockAction(action)) {
+          return {
+            success: false,
+            error: "action must be one of: set, stop, pause, resume, nextSession",
+          };
+        }
+        if (requestId !== undefined && typeof requestId !== "string") {
+          return { success: false, error: "requestId must be a string when provided" };
+        }
+        const normalizedRequestId = typeof requestId === "string" ? requestId : undefined;
+        if (!service?.hasValidIdentity() || !service?.isConnected()) {
+          return { success: false, error: "Not connected to Focus world" };
+        }
+
+        let normalizedClock: ClockConfig | undefined;
+        if (action === "set") {
+          const { clock: nextClock, error } = normalizeClockConfig(clock);
+          if (!nextClock) {
+            return { success: false, error: error ?? "Invalid clock payload" };
+          }
+          normalizedClock = nextClock;
+        }
+
+        const sent = service.sendClock(action, normalizedClock, normalizedRequestId);
+        if (!sent) {
+          return { success: false, error: "Failed to send clock payload" };
+        }
+
+        return {
+          success: true,
+          action,
+          requestId: normalizedRequestId,
+          ...(normalizedClock ? { clock: normalizedClock } : {}),
         };
       },
     });
