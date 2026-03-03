@@ -481,8 +481,8 @@ function buildFocusPrompt(): string {
     "- Use `focus_action` sparingly. Only send meaningful status changes, not every tool call.",
     "- If the user explicitly asks for a specific Focus pose or action, follow the user's request.",
     "- If the user explicitly says not to sync Focus, skip Focus tool calls.",
-    "- Use `focus_clock` only when you judge it helpful to mark or communicate the duration of the current task.",
-    "- `focus_clock` is optional. Prefer it for timing-oriented work such as countdowns, count-up tracking, or pomodoro sessions.",
+    "- Use `focus_clock` when you judge it helpful to mark or communicate the duration of the current task, especially for somewhat time-consuming work or multi-step tasks.",
+    "- `focus_clock` is optional. Prefer giving an estimated duration for tasks that may take a while or involve multiple steps, not only explicit timing workflows such as countdowns, count-up tracking, or pomodoro sessions.",
     "- Do not add automatic Focus sync when the task itself is only about `focus_join`, `focus_leave`, `focus_action`, or `focus_clock`.",
   ].join("\n");
 }

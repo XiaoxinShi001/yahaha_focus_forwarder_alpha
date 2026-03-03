@@ -25,7 +25,7 @@ Before installing the plugin, save `mateId` to the `identity.json` file under th
 Then install and enable the plugin:
 
 ```bash
-openclaw plugins install @yahaha-studio/focus-forwarder@0.0.1-alpha.11
+openclaw plugins install @yahaha-studio/focus-forwarder@0.0.1-alpha.12
 openclaw plugins enable focus-forwarder
 ```
 
@@ -106,7 +106,7 @@ Parameters:
 
 ### focus_clock
 
-Send a clock command to Focus World. Use this only when you judge it useful to annotate the current task's duration or timing mode.
+Send a clock command to Focus World, including pomodoro, countdown, count-up, stop, pause, resume, and nextSession.
 
 ```text
 focus_clock(action: "set", clock: { mode: "pomodoro", focusSeconds: 1500, shortBreakSeconds: 300, longBreakSeconds: 900, sessionCount: 4 })
@@ -202,6 +202,9 @@ User says: "Sit down and type"
 User says: "Lie flat"
 -> `focus_action(poseType: "lay", action: "Lie Flat", bubble: "Relaxing...")`
 
+User says: "Set a 30-minute countdown"
+-> `focus_clock(action: "set", clock: { mode: "countDown", durationSeconds: 1800 })`
+
 ## Files
 
 The plugin stores files under the current user's home directory in `.openclaw/focus-world/`.
@@ -234,5 +237,5 @@ Custom actions can be configured in the home-directory `skills-config.json` file
 - The injected prompt tells OpenClaw that `focus_action` is available for contextual status sync, but does not hardcode any specific action choice
 - The injected prompt also tells OpenClaw that `focus_clock` is optional and should only be used when timing information is useful for the current task
 - Use `focus_action` to manually perform specific actions on user request or to reflect meaningful task-state changes
-- Use `focus_clock` to mark task duration with pomodoro, countdown, or count-up when that timing signal is useful
+- If the user explicitly requests a timer, countdown, count-up, or pomodoro, use `focus_clock` with the exact requested duration or mode
 - Bubble text shows short status, up to 5 words
