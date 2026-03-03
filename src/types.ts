@@ -1,7 +1,6 @@
 export type FocusForwarderConfig = {
   wsUrl: string;
   enabled: boolean;
-  cooldownMs: number;
 };
 
 export type PoseType = "stand" | "sit" | "lay" | "floor";
@@ -14,11 +13,6 @@ export type ActionResult = {
 
 export type SkillsConfig = {
   actions: Record<PoseType, string[]>;
-  fallbacks: {
-    done: ActionResult;
-    thinking: ActionResult;
-    working: ActionResult;
-  };
   llm: {
     enabled: boolean;
   };

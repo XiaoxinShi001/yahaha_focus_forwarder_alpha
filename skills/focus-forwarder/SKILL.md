@@ -25,7 +25,7 @@ Before installing the plugin, save `userId` to the `identity.json` file under th
 Then install and enable the plugin:
 
 ```bash
-openclaw plugins install @yahaha-studio/focus-forwarder@0.0.1-alpha.8
+openclaw plugins install @yahaha-studio/focus-forwarder@0.0.1-alpha.9
 openclaw plugins enable focus-forwarder
 ```
 
@@ -68,7 +68,7 @@ focus_leave()
 
 ### focus_action
 
-Send an action or pose to Focus World. Use this when a user asks you to do something in Focus, for example "dance", "wave", or "sit and type".
+Send an action or pose to Focus World. Use this when a user asks you to do something in Focus, for example "dance", "wave", or "sit and type". The plugin also injects prompt guidance so OpenClaw uses this tool to sync task lifecycle status to Focus App.
 
 ```text
 focus_action(poseType: "stand", action: "Yay", bubble: "Dancing!")
@@ -78,17 +78,6 @@ Parameters:
 - `poseType` (required): `stand`, `sit`, `lay`, or `floor`
 - `action` (required): Action name to perform
 - `bubble` (optional): Bubble text to display, max 5 words
-
-### focus_set_llm_enabled
-
-Enable or disable LLM-based automatic action selection for Focus Forwarder. Use this when the user asks to stop or resume LLM-based action picking for Focus Forwarder.
-
-```text
-focus_set_llm_enabled(enabled: false)
-```
-
-Parameters:
-- `enabled` (required): `true` to use `pickActionWithLLM` for automatic status sync, `false` to force all automatic status updates to use fallback keyword mapping
 
 ## Available Actions
 
@@ -164,12 +153,6 @@ User says: "Sit down and type"
 User says: "Lie flat"
 -> `focus_action(poseType: "lay", action: "Lie Flat", bubble: "Relaxing...")`
 
-User says: "Disable Focus Forwarder LLM requests"
--> `focus_set_llm_enabled(enabled: false)`
-
-User says: "Enable Focus Forwarder LLM requests again"
--> `focus_set_llm_enabled(enabled: true)`
-
 ## Files
 
 The plugin stores files under the current user's home directory in `.openclaw/focus-world/`.
@@ -179,37 +162,26 @@ The plugin stores files under the current user's home directory in `.openclaw/fo
 - Windows: `%USERPROFILE%\\.openclaw\\focus-world\\`
 
 - `identity.json` - userId (bootstrap) and authKey (managed by plugin)
-- `skills-config.json` - actions, fallbacks, and `llm.enabled` runtime config
+- `skills-config.json` - allowed action lists used by `focus_action`
 
 ## Skills Config
 
-Custom actions and the Focus Forwarder LLM toggle can be configured in the home-directory `skills-config.json` file:
+Custom actions can be configured in the home-directory `skills-config.json` file:
 
 ```json
 {
-  "llm": {
-    "enabled": true
-  },
   "actions": {
     "stand": ["HIgh Five", "Listen Music", "Arm Stretch", "BackBend Stretch", "Making Selfie", "Arms Crossed", "Epiphany", "Angry", "Yay", "Dance", "Sing", "Tired", "Wait", "Stand Phone Talk", "Stand Phone Play", "Curtsy"],
     "sit": ["Typing with Keyboard", "Thinking", "Study Look At", "Writing", "Crazy", "Homework", "Take Notes", "Hand Cramp", "Dozing", "Phone Talk", "Situp with Arms Crossed", "Situp with Cross Legs", "Relax with Arms Crossed", "Eating", "Laze", "Laze with Cross Legs", "Typing with Phone", "Sit with Arm Stretch", "Drink", "Sit with Making Selfie", "Play Game", "Situp Sleep", "Sit Phone Play"],
     "lay": ["Bend One Knee", "Sleep Curl Up Side way", "Rest Chin", "Lie Flat", "Lie Face Down", "Lie Side"],
     "floor": ["Seiza", "Cross Legged", "Knee Hug"]
-  },
-  "fallbacks": {
-    "done": { "poseType": "stand", "action": "Yay", "bubble": "Done!" },
-    "thinking": { "poseType": "stand", "action": "Wait", "bubble": "Thinking..." },
-    "working": { "poseType": "stand", "action": "Arms Crossed", "bubble": "Working" }
   }
 }
 ```
 
-When `llm.enabled` is `true`, automatic status sync uses `pickActionWithLLM`. When it is `false`, all automatic status updates use fallback keyword mapping instead. Changes take effect immediately; no restart is required for this file.
-
 ## How It Works
 
-- Plugin automatically syncs status when you are working
-- Automatic sync uses LLM only when `llm.enabled` is `true`
-- `focus_set_llm_enabled` updates the home-directory `skills-config.json` file and takes effect immediately
+- When Focus World is connected, the plugin injects prompt instructions before agent runs
+- The injected prompt tells OpenClaw to call `focus_action` before work starts, during active execution, and again when the task is complete
 - Use `focus_action` to manually perform specific actions on user request
 - Bubble text shows short status, up to 5 words

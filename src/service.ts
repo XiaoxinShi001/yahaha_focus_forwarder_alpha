@@ -3,7 +3,7 @@ import * as fs from "fs";
 import os from "node:os";
 import * as path from "path";
 import type { Logger } from "openclaw/plugin-sdk";
-import type { FocusForwarderConfig, FocusIdentity, StatusPayload } from "./types.js";
+import type { FocusForwarderConfig, FocusIdentity, PoseType, StatusPayload } from "./types.js";
 
 const IDENTITY_DIR = path.join(os.homedir(), ".openclaw", "focus-world");
 const IDENTITY_PATH = path.join(IDENTITY_DIR, "identity.json");
@@ -113,7 +113,7 @@ export class FocusForwarderService {
     this.logger.info("AuthKey cleared");
   }
 
-  sendStatus(poseType: string, action: string, bubble: string, log: string): void {
+  sendStatus(poseType: PoseType, action: string, bubble: string, log: string): void {
     if (!this.identity?.authKey || this.ws?.readyState !== WebSocket.OPEN) return;
     const payload: StatusPayload = {
       type: "status", 

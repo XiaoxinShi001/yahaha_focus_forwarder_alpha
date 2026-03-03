@@ -15,16 +15,11 @@
       "enabled": {
         "type": "boolean",
         "default": true
-      },
-      "cooldownMs": {
-        "type": "number",
-        "default": 15000
       }
     }
   },
   "uiHints": {
     "wsUrl": { "label": "WebSocket URL", "placeholder": "ws://host:port/ws/openclaw" },
-    "enabled": { "label": "Enable Plugin" },
-    "cooldownMs": { "label": "Status Cooldown (ms)", "placeholder": "15000" }
+    "enabled": { "label": "Enable Plugin" }
   }
 }
