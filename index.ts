@@ -473,17 +473,20 @@ Return ONLY JSON: {"poseType":"stand|sit|lay|floor","action":"<action name>","bu
 }
 
 function buildFocusPrompt(): string {
-  return [
-    "Focus App status sync is available for substantive work in this turn.",
-    "Use `focus_action` when it is useful to reflect your current task state in Focus App.",
-    "Choose the poseType, action, and bubble from the actual task context. Do not rely on fixed default actions from this prompt.",
+  return [    
+    "Focus App status sync is available. Use `focus_action` to reflect your task state.",
+    "",
     "Rules:",
-    "- Use `focus_action` sparingly. Only send meaningful status changes, not every tool call.",
-    "- If the user explicitly asks for a specific Focus pose or action, follow the user's request.",
-    "- If the user explicitly says not to sync Focus, skip Focus tool calls.",
-    "- Use `focus_clock` when you judge it helpful to mark or communicate the duration of the current task, especially for somewhat time-consuming work or multi-step tasks.",
-    "- `focus_clock` is optional. Prefer giving an estimated duration for tasks that may take a while or involve multiple steps, not only explicit timing workflows such as countdowns, count-up tracking, or pomodoro sessions.",
-    "- Do not add automatic Focus sync when the task itself is only about `focus_join`, `focus_leave`, `focus_action`, or `focus_clock`.",
+    "- Use for meaningful status changes: starting work, switching tasks, completing segments, finishing",
+    "- Choose poseType, action, and bubble based on actual task context, not fixed defaults",
+    "- Send focus_action when task completes to reflect completion state",
+    "- Use `focus_clock` to communicate task duration:",
+    "  • Multi-step tasks (reading multiple files, writing code, running commands)",
+    "  • Time-consuming operations (searches, builds, complex edits)",
+    "  • User-requested timers (countdowns, pomodoros)",
+    "  • Estimate duration and start a countDown clock at task beginning",
+    "- Skip if user says not to sync, or if the task is only about focus_* tools themselves",
+    "- Follow user's explicit requests for specific poses/actions",
   ].join("\n");
 }
 

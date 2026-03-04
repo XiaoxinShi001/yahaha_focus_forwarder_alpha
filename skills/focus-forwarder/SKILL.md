@@ -25,7 +25,7 @@ Before installing the plugin, save `mateId` to the `identity.json` file under th
 Then install and enable the plugin:
 
 ```bash
-openclaw plugins install @yahaha-studio/focus-forwarder@0.0.1-alpha.13
+openclaw plugins install @yahaha-studio/focus-forwarder@0.0.1-alpha.14
 openclaw plugins enable focus-forwarder
 ```
 
