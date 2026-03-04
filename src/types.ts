@@ -112,19 +112,19 @@ export type ClockControlPayload = ClockPayloadBase & {
 
 export type ClockPayload = ClockSetPayload | ClockControlPayload;
 
-export type NoteBoardNote = {
-  id: string;
-  ownerName: string;
+export type QueryNotesBoardNote = {
+  creatorName: string;
+  isCreatedByCurrentMate: boolean;
   createTime: string;
+  updateTime: string;
   data: string;
-  parentId?: string;
 };
 
-export type NoteBoard = {
+export type QueryNotesBoard = {
   propId: string;
   noteCount: number;
-  latestActivityAt?: string;
-  notes: NoteBoardNote[];
+  latestActivityAt: string;
+  notes: QueryNotesBoardNote[];
 };
 
 export type QueryNotesBoardPayload = {
@@ -139,11 +139,11 @@ export type QueryNotesBoardSuccessPayload = {
   requestId: string;
   success: true;
   mateId: string;
-  spaceId?: string;
-  dailyLimit?: number;
-  remaining?: number;
-  resetAtUtc?: string;
-  boards: NoteBoard[];
+  spaceId: string;
+  dailyLimit: number;
+  remaining: number;
+  resetAtUtc: string;
+  boards: QueryNotesBoard[];
 };
 
 export type QueryNotesBoardFailurePayload = {
@@ -164,13 +164,10 @@ export type CreateNotesBoardNotePayload = {
   data: string;
 };
 
-export type ReplyNotesBoardNotePayload = {
-  type: "reply_notes_board_note";
-  requestId: string;
-  mateId: string;
-  authKey: string;
-  propId: string;
-  parentId: string;
+export type CreateNotesBoardNote = {
+  id: string;
+  ownerName: string;
+  createTime: string;
   data: string;
 };
 
@@ -183,15 +180,11 @@ type NotesBoardMutationSuccessPayloadBase = {
   dailyLimit?: number;
   remaining?: number;
   resetAtUtc?: string;
-  note: NoteBoardNote;
+  note: CreateNotesBoardNote;
 };
 
 export type CreateNotesBoardNoteSuccessPayload = NotesBoardMutationSuccessPayloadBase & {
   type: "create_notes_board_note_result";
-};
-
-export type ReplyNotesBoardNoteSuccessPayload = NotesBoardMutationSuccessPayloadBase & {
-  type: "reply_notes_board_note_result";
 };
 
 export type CreateNotesBoardNoteFailurePayload = {
@@ -199,15 +192,6 @@ export type CreateNotesBoardNoteFailurePayload = {
   requestId: string;
 } & FocusErrorResult;
 
-export type ReplyNotesBoardNoteFailurePayload = {
-  type: "reply_notes_board_note_result";
-  requestId: string;
-} & FocusErrorResult;
-
 export type CreateNotesBoardNoteResultPayload =
   | CreateNotesBoardNoteSuccessPayload
   | CreateNotesBoardNoteFailurePayload;
-
-export type ReplyNotesBoardNoteResultPayload =
-  | ReplyNotesBoardNoteSuccessPayload
-  | ReplyNotesBoardNoteFailurePayload;

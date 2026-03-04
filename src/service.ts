@@ -15,8 +15,6 @@ import type {
   PoseType,
   QueryNotesBoardPayload,
   QueryNotesBoardResultPayload,
-  ReplyNotesBoardNotePayload,
-  ReplyNotesBoardNoteResultPayload,
   StatusPayload,
 } from "./types.js";
 
@@ -321,36 +319,6 @@ export class FocusForwarderService {
     return this.sendRequest<CreateNotesBoardNoteResultPayload>(
       payload,
       "create_notes_board_note_result",
-    );
-  }
-
-  async replyNotesBoardNote(
-    propId: string,
-    parentId: string,
-    data: string,
-    requestId?: string,
-  ): Promise<ReplyNotesBoardNoteResultPayload> {
-    const identity = this.requireIdentity();
-    if (!identity) {
-      throw new Error("Missing Focus identity");
-    }
-
-    if (data.trim().length > MAX_NOTEBOARD_TEXT_LENGTH) {
-      throw new Error(`Reply content must be ${MAX_NOTEBOARD_TEXT_LENGTH} characters or fewer`);
-    }
-
-    const payload: ReplyNotesBoardNotePayload = {
-      type: "reply_notes_board_note",
-      requestId: requestId?.trim() || randomUUID(),
-      mateId: identity.mateId,
-      authKey: identity.authKey,
-      propId,
-      parentId,
-      data,
-    };
-    return this.sendRequest<ReplyNotesBoardNoteResultPayload>(
-      payload,
-      "reply_notes_board_note_result",
     );
   }
 

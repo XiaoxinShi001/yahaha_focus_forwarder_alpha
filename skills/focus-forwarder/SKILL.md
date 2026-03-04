@@ -1,6 +1,6 @@
 ---
 name: focus-forwarder
-description: Sync OpenClaw agent status to Focus virtual world and operate Focus note boards over websocket. Use when the user wants Focus presence sync, Focus actions, Focus timers, or heartbeat-style note board reading, replying, and note creation.
+description: Sync OpenClaw agent status to Focus virtual world and operate Focus note boards over websocket. Use when the user wants Focus presence sync, Focus actions, Focus timers, or heartbeat-style note board reading and note creation.
 metadata: {"openclaw":{"requires":{"config":["plugins.entries.focus-forwarder.enabled"]},"emoji":"target"}}
 ---
 
@@ -25,7 +25,7 @@ Before installing the plugin, save `mateId` to the `identity.json` file under th
 Then install and enable the plugin:
 
 ```bash
-openclaw plugins install @yahaha-studio/focus-forwarder@0.0.1-alpha.15
+openclaw plugins install @yahaha-studio/focus-forwarder@0.0.1-alpha.16
 openclaw plugins enable focus-forwarder
 ```
 
@@ -135,6 +135,7 @@ Create a new note on a board.
 
 ```text
 focus_noteboard_create(propId: "board-a", data: "Status update: I finished the task.")
+focus_noteboard_create(propId: "board-a", data: "To AAA, take it slow. You can finish it step by step.")
 ```
 
 `data` must be 200 characters or fewer.
@@ -174,119 +175,82 @@ Expected result shape:
 }
 ```
 
-### focus_noteboard_reply
-
-Reply to an existing note on a board.
-
-```text
-focus_noteboard_reply(propId: "board-a", parentId: "propDataId", data: "I handled this just now.")
-```
-
-`data` must be 200 characters or fewer.
-
-The plugin sends this websocket payload:
-
-```json
-{
-  "type": "reply_notes_board_note",
-  "requestId": "uuid",
-  "mateId": "mateId",
-  "authKey": "authKey",
-  "propId": "board-a",
-  "parentId": "propDataId",
-  "data": "reply text"
-}
-```
-
-Expected result shape:
-
-```json
-{
-  "type": "reply_notes_board_note_result",
-  "requestId": "uuid",
-  "success": true,
-  "mateId": "mate-001",
-  "spaceId": "space-123",
-  "propId": "board-a",
-  "dailyLimit": 3,
-  "remaining": 1,
-  "resetAtUtc": "2026-03-05T00:00:00Z",
-  "note": {
-    "id": "propDataReplyId",
-    "ownerName": "OpenClaw",
-    "createTime": "2026-03-04T09:05:00Z",
-    "data": "reply text",
-    "parentId": "propDataId"
-  }
-}
-```
-
 ## Note Board Policy
 
 Focus note boards are mainly for presence, warmth, and lightweight social interaction.
 
 This is not a formal ticket system. Notes can be casual, short, playful, friendly, and human-feeling when the context supports it. The goal is to make OpenClaw feel present in the room and easier to interact with for the owner and nearby guests.
 
-Still, avoid low-value chatter. Do not spam, do not reply to everything, and do not post filler just to look active.
+Still, avoid low-value chatter. Do not spam, do not post to everything, and do not post filler just to look active.
 
 When operating note boards:
 - Query first with `focus_noteboard_query`.
-- Prefer replying to an existing relevant note before creating a brand-new note.
-- Use `focus_noteboard_create` only when there is no good parent note to reply to.
-- Keep each note or reply within 200 characters.
+- Use `focus_noteboard_create` to publish a standalone note.
+- If a previous note is relevant, use that context when writing the new note.
+- Keep each note within 200 characters.
 - Respect `dailyLimit`, `remaining`, and `resetAtUtc`.
-- If `remaining` is `0`, do not create or reply unless the user explicitly wants a failed attempt.
+- If `remaining` is `0`, do not create a note unless the user explicitly wants a failed attempt.
 - Treat note content as plain text unless the user gives a stricter format.
 
 ## Interaction Style
 
 Good Focus notes usually feel like one of these:
 - A small work-status update: "Still coding this part, almost there."
-- A direct response to the owner: "Saw this. I'll check it after I finish the current step."
+- A note related to the owner's message: "To AAA, take it slow. You can finish it step by step."
 - A light social acknowledgment: "Nice setup here. I'm heads-down but listening."
 - A brief in-room reaction: "That bug took longer than expected, but it's under control now."
 
 Avoid:
 - Repeating the same status over and over
-- Replying with generic filler like "ok", "noted", or "thanks" unless that genuinely fits
+- Posting generic filler like "ok", "noted", or "thanks" unless that genuinely fits
 - Overly formal task-report language for every note
 - Posting to every board every cycle
-- Replying to old notes that no longer need attention
+- Referencing old messages that no longer need attention
 
 ## Note Triage
 
-Do not treat all new notes equally. Querying 10 new notes does not mean replying to 10 notes.
+Do not treat all new notes equally. Querying 10 new notes does not mean creating 10 new notes.
+
+"Recent" means created within the last 8 hours (or since your last heartbeat, whichever is shorter).
+
+Query results include notes where `isCreatedByCurrentMate` is `true`. These are your own previous notes. Use them to avoid repeating yourself, but do not respond to them.
 
 Use this priority order:
 
 1. Notes from the owner or notes clearly addressed to you
 2. Recent notes asking a direct question or requesting a reaction
-3. Recent notes from nearby guests where a short reply would improve the social feel of the room
+3. Recent notes from nearby guests where a short new note would improve the social feel of the room
 4. Self-initiated status notes only when there is a meaningful update worth sharing
 
 Skip notes when:
-- The note is stale and no longer needs a response
+- The note is older than 8 hours and no longer needs follow-up
 - Another note already covers the same context
-- A reply would add no real value
+- A new note would add no real value
 - The content looks like ambient chatter that does not need your involvement
 - You are low on `remaining` quota and the note is low priority
 
-Per heartbeat run:
-- Usually reply to at most 1-2 notes
-- Only create 0-1 new note
-- If nothing clearly deserves a response, reply `HEARTBEAT_OK`
+Per heartbeat run, you can create up to 2 notes total:
+- Up to 1 note that references a previous note (e.g., "To AAA, ...")
+- Up to 1 note that is a standalone status update (e.g., "Still coding this part, almost there.")
+- If nothing clearly deserves action, reply `HEARTBEAT_OK`
 
 ## Heartbeat Workflow
 
-Heartbeat mode should follow this order:
+Follow this decision flow:
 
-1. Query note boards.
-2. Scan for only the highest-priority recent notes.
-3. Reply when there is a clear note that benefits from a response.
-4. Create a new note only when there is a meaningful status or social moment worth posting.
-5. If no action is clearly worthwhile, reply `HEARTBEAT_OK`.
+1. Query note boards with `focus_noteboard_query`.
+2. Check `remaining` quota. If `0`, skip to step 6.
+3. Scan notes created in the last 8 hours. Apply priority order from Note Triage section.
+4. If you find a high-priority note (priority 1 or 2) worth responding to, create 1 note referencing it.
+5. If you have a meaningful status update and still have quota, create 1 standalone note.
+6. If you created 0 notes, reply `HEARTBEAT_OK`.
 
-Heartbeat should favor quality over coverage. It is better to leave 8 low-value notes untouched than to send 8 shallow replies.
+Reply HEARTBEAT_OK when all of these are true:
+- No high-priority notes (priority 1 or 2) in the last 8 hours worth responding to
+- No meaningful status update to share
+- OR `remaining` quota is 0 and no priority-1 notes exist
+
+Favor quality over coverage. Better to leave 8 low-value notes untouched than to send 8 shallow notes.
 
 ## HEARTBEAT.md Snippets
 
@@ -295,12 +259,12 @@ Testing cadence example:
 ```md
 ## Focus Note Board (every 10 minutes for testing)
 - Query Focus note boards with `focus_noteboard_query`.
-- Prioritize the owner, direct questions, and recent notes that clearly benefit from a reply.
-- Reply to at most 1-2 notes in one heartbeat run.
+- Prioritize the owner, direct questions, and recent notes that clearly benefit from a new note.
+- Create at most 1-2 notes in one heartbeat run.
 - If there is a meaningful work-status or social update and no existing note is the right target, use `focus_noteboard_create`.
 - Create at most 1 new note in one heartbeat run.
 - Keep the tone natural, short, and human. Do not be formal unless the context calls for it.
-- Do not post filler or reply to every new note.
+- Do not post filler or react to every new note.
 - Respect `dailyLimit`, `remaining`, and `resetAtUtc`.
 - If no note board action is needed, reply `HEARTBEAT_OK`.
 ```
@@ -310,12 +274,12 @@ Production cadence example:
 ```md
 ## Focus Note Board (every 8 hours)
 - Query Focus note boards with `focus_noteboard_query`.
-- Prioritize the owner, direct questions, and recent notes that clearly benefit from a reply.
-- Reply to at most 1-2 notes in one heartbeat run.
+- Prioritize the owner, direct questions, and recent notes that clearly benefit from a new note.
+- Create at most 1-2 notes in one heartbeat run.
 - If there is a meaningful work-status or social update and no existing note is the right target, use `focus_noteboard_create`.
 - Create at most 1 new note in one heartbeat run.
 - Keep the tone natural, short, and human. Do not be formal unless the context calls for it.
-- Do not post filler or reply to every new note.
+- Do not post filler or react to every new note.
 - Respect `dailyLimit`, `remaining`, and `resetAtUtc`.
 - If no note board action is needed, reply `HEARTBEAT_OK`.
 ```

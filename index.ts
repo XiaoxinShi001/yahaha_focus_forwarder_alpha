@@ -9,14 +9,11 @@ import type {
   ActionResult,
   ClockAction,
   ClockConfig,
+  CreateNotesBoardNote,
   CreateNotesBoardNoteResultPayload,
   FocusForwarderConfig,
-  NoteBoard,
-  NoteBoardNote,
   PomodoroPhase,
   PoseType,
-  QueryNotesBoardResultPayload,
-  ReplyNotesBoardNoteResultPayload,
   SkillsConfig,
 } from "./src/types.js";
 
@@ -332,7 +329,7 @@ function truncateNoteData(
   return { data: `${data.slice(0, maxLen)}...`, dataTruncated: true };
 }
 
-function summarizeNote(note: NoteBoardNote) {
+function summarizeCreatedNote(note: CreateNotesBoardNote) {
   const { data, dataTruncated } = truncateNoteData(note.data);
   return {
     id: note.id,
@@ -340,59 +337,10 @@ function summarizeNote(note: NoteBoardNote) {
     createTime: note.createTime,
     data,
     dataTruncated,
-    ...(note.parentId ? { parentId: note.parentId } : {}),
   };
 }
 
-function summarizeBoard(board: NoteBoard) {
-  return {
-    propId: board.propId,
-    noteCount: board.noteCount,
-    latestActivityAt: board.latestActivityAt,
-    notes: board.notes.map(summarizeNote),
-  };
-}
-
-function buildNotesBoardSummary(result: QueryNotesBoardResultPayload): string {
-  if (!result.success) {
-    const parts = ["Query failed"];
-    if ("errorCode" in result && result.errorCode) {
-      parts.push(`error=${result.errorCode}`);
-    }
-    if (typeof result.remaining === "number") {
-      parts.push(`remaining=${result.remaining}`);
-    }
-    if (result.resetAtUtc) {
-      parts.push(`resetAtUtc=${result.resetAtUtc}`);
-    }
-    return parts.join(", ");
-  }
-
-  if (result.boards.length === 0) {
-    return "No note boards returned.";
-  }
-
-  return result.boards
-    .map((board) => {
-      const latest = board.latestActivityAt ? `latest=${board.latestActivityAt}` : "latest=unknown";
-      const preview =
-        board.notes.length > 0
-          ? board.notes
-              .slice(0, 3)
-              .map((note) => {
-                const text = truncateNoteData(note.data, 80).data.replace(/\s+/g, " ").trim();
-                return `${note.ownerName}: ${text}`;
-              })
-              .join(" | ")
-          : "no notes";
-      return `${board.propId} (${board.noteCount} notes, ${latest}) ${preview}`;
-    })
-    .join("\n");
-}
-
-function buildMutationSummary(
-  result: CreateNotesBoardNoteResultPayload | ReplyNotesBoardNoteResultPayload,
-): string {
+function buildMutationSummary(result: CreateNotesBoardNoteResultPayload): string {
   if (!result.success) {
     const parts = ["Mutation failed"];
     if ("errorCode" in result && result.errorCode) {
@@ -834,7 +782,7 @@ const plugin = {
     api.registerTool({
       name: "focus_noteboard_query",
       description:
-        "Query Focus note boards for the current mate. Use this before replying or creating a new note, especially during heartbeat checks.",
+        "Query Focus note boards for the current mate. Use this before creating a new note, especially when you may want to relate it to an existing note.",
       parameters: {
         type: "object",
         properties: {
@@ -857,24 +805,7 @@ const plugin = {
           const result = await service.queryNotesBoard(
             typeof requestId === "string" ? requestId : undefined,
           );
-          if (!result.success) {
-            return {
-              ...result,
-              summary: buildNotesBoardSummary(result),
-            };
-          }
-
-          return {
-            success: true,
-            requestId: result.requestId,
-            mateId: result.mateId,
-            spaceId: result.spaceId,
-            dailyLimit: result.dailyLimit,
-            remaining: result.remaining,
-            resetAtUtc: result.resetAtUtc,
-            boards: result.boards.map(summarizeBoard),
-            summary: buildNotesBoardSummary(result),
-          };
+          return result;
         } catch (error) {
           return {
             success: false,
@@ -953,103 +884,13 @@ const plugin = {
             dailyLimit: result.dailyLimit,
             remaining: result.remaining,
             resetAtUtc: result.resetAtUtc,
-            note: summarizeNote(result.note),
+            note: summarizeCreatedNote(result.note),
             summary: buildMutationSummary(result),
           };
         } catch (error) {
           return {
             success: false,
             error: `Failed to create note: ${error}`,
-          };
-        }
-      },
-    });
-
-    api.registerTool({
-      name: "focus_noteboard_reply",
-      description:
-        "Reply to an existing note on a specific Focus note board. Query first so you can choose the correct parent note.",
-      parameters: {
-        type: "object",
-        properties: {
-          propId: {
-            type: "string",
-            description: "Board property ID that contains the parent note.",
-          },
-          parentId: {
-            type: "string",
-            description: "Parent note ID to reply to.",
-          },
-          data: {
-            type: "string",
-            description: "Reply content. Maximum 200 characters.",
-          },
-          requestId: {
-            type: "string",
-            description: "Optional request ID for tracing or deduplication.",
-          },
-        },
-        required: ["propId", "parentId", "data"],
-      },
-      execute: async (_toolCallId, params) => {
-        const { propId, parentId, data, requestId } = (params || {}) as {
-          propId?: unknown;
-          parentId?: unknown;
-          data?: unknown;
-          requestId?: unknown;
-        };
-        if (typeof propId !== "string" || !propId.trim()) {
-          return { success: false, error: "propId is required" };
-        }
-        if (typeof parentId !== "string" || !parentId.trim()) {
-          return { success: false, error: "parentId is required" };
-        }
-        if (typeof data !== "string" || !data.trim()) {
-          return { success: false, error: "data is required" };
-        }
-        if (data.trim().length > MAX_NOTEBOARD_TEXT_LENGTH) {
-          return {
-            success: false,
-            error: `data must be ${MAX_NOTEBOARD_TEXT_LENGTH} characters or fewer`,
-          };
-        }
-        if (requestId !== undefined && typeof requestId !== "string") {
-          return { success: false, error: "requestId must be a string when provided" };
-        }
-        if (!service?.hasValidIdentity() || !service?.isConnected()) {
-          return { success: false, error: "Not connected to Focus world" };
-        }
-
-        try {
-          const result = await service.replyNotesBoardNote(
-            propId.trim(),
-            parentId.trim(),
-            data.trim(),
-            typeof requestId === "string" ? requestId : undefined,
-          );
-          if (!result.success) {
-            return {
-              ...result,
-              summary: buildMutationSummary(result),
-            };
-          }
-
-          return {
-            success: true,
-            requestId: result.requestId,
-            mateId: result.mateId,
-            spaceId: result.spaceId,
-            propId: result.propId,
-            dailyLimit: result.dailyLimit,
-            remaining: result.remaining,
-            resetAtUtc: result.resetAtUtc,
-            note: summarizeNote(result.note),
-            summary: buildMutationSummary(result),
-          };
-        } catch (error) {
-          return {
-            success: false,
-            error: `Failed to reply to note: ${error}`,
           };
         }
       },
