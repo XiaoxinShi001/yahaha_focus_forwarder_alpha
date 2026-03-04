@@ -1,6 +1,6 @@
 {
   "name": "@yahaha-studio/focus-forwarder",
-  "version": "0.0.1-alpha.14",
+  "version": "0.0.1-alpha.15",
   "description": "Forward OpenClaw agent events to external WebSocket server for visualization",
   "type": "module",
   "main": "index.ts",
@@ -17,6 +17,7 @@
     "ws": "^8.19.0"
   },
   "devDependencies": {
+    "@types/node": "^24.3.0",
     "@types/ws": "^8.18.1",
     "openclaw": "*"
   }

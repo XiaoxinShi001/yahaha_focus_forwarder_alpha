@@ -23,6 +23,16 @@ export type FocusIdentity = {
   authKey?: string;
 };
 
+export type FocusErrorResult = {
+  success: false;
+  errorCode?: string;
+  error?: string;
+  message?: string;
+  dailyLimit?: number;
+  remaining?: number;
+  resetAtUtc?: string;
+};
+
 export type JoinPayload = {
   type: "join";
   mateId: string;
@@ -101,3 +111,103 @@ export type ClockControlPayload = ClockPayloadBase & {
 };
 
 export type ClockPayload = ClockSetPayload | ClockControlPayload;
+
+export type NoteBoardNote = {
+  id: string;
+  ownerName: string;
+  createTime: string;
+  data: string;
+  parentId?: string;
+};
+
+export type NoteBoard = {
+  propId: string;
+  noteCount: number;
+  latestActivityAt?: string;
+  notes: NoteBoardNote[];
+};
+
+export type QueryNotesBoardPayload = {
+  type: "query_notes_board";
+  requestId: string;
+  mateId: string;
+  authKey: string;
+};
+
+export type QueryNotesBoardSuccessPayload = {
+  type: "query_notes_board_result";
+  requestId: string;
+  success: true;
+  mateId: string;
+  spaceId?: string;
+  dailyLimit?: number;
+  remaining?: number;
+  resetAtUtc?: string;
+  boards: NoteBoard[];
+};
+
+export type QueryNotesBoardFailurePayload = {
+  type: "query_notes_board_result";
+  requestId: string;
+} & FocusErrorResult;
+
+export type QueryNotesBoardResultPayload =
+  | QueryNotesBoardSuccessPayload
+  | QueryNotesBoardFailurePayload;
+
+export type CreateNotesBoardNotePayload = {
+  type: "create_notes_board_note";
+  requestId: string;
+  mateId: string;
+  authKey: string;
+  propId: string;
+  data: string;
+};
+
+export type ReplyNotesBoardNotePayload = {
+  type: "reply_notes_board_note";
+  requestId: string;
+  mateId: string;
+  authKey: string;
+  propId: string;
+  parentId: string;
+  data: string;
+};
+
+type NotesBoardMutationSuccessPayloadBase = {
+  requestId: string;
+  success: true;
+  mateId: string;
+  spaceId?: string;
+  propId: string;
+  dailyLimit?: number;
+  remaining?: number;
+  resetAtUtc?: string;
+  note: NoteBoardNote;
+};
+
+export type CreateNotesBoardNoteSuccessPayload = NotesBoardMutationSuccessPayloadBase & {
+  type: "create_notes_board_note_result";
+};
+
+export type ReplyNotesBoardNoteSuccessPayload = NotesBoardMutationSuccessPayloadBase & {
+  type: "reply_notes_board_note_result";
+};
+
+export type CreateNotesBoardNoteFailurePayload = {
+  type: "create_notes_board_note_result";
+  requestId: string;
+} & FocusErrorResult;
+
+export type ReplyNotesBoardNoteFailurePayload = {
+  type: "reply_notes_board_note_result";
+  requestId: string;
+} & FocusErrorResult;
+
+export type CreateNotesBoardNoteResultPayload =
+  | CreateNotesBoardNoteSuccessPayload
+  | CreateNotesBoardNoteFailurePayload;
+
+export type ReplyNotesBoardNoteResultPayload =
+  | ReplyNotesBoardNoteSuccessPayload
+  | ReplyNotesBoardNoteFailurePayload;
