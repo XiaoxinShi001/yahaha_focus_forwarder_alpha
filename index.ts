@@ -516,20 +516,32 @@ Return ONLY JSON: {"poseType":"stand|sit|lay|floor","action":"<action name>","bu
 }
 
 function buildFocusPrompt(): string {
-  return [    
-    "Focus App status sync is available. Use `focus_action` to reflect your task state.",
+  return [
+    "Focus App status sync is available via `focus_action` and `focus_clock`.",
     "",
-    "Rules:",
-    "- Use for meaningful status changes: starting work, switching tasks, completing segments, finishing",
-    "- Choose poseType, action, and bubble based on actual task context, not fixed defaults",
-    "- Send focus_action when task completes to reflect completion state",
-    "- Use `focus_clock` to communicate task duration:",
-    "  • Multi-step tasks (reading multiple files, writing code, running commands)",
-    "  • Time-consuming operations (searches, builds, complex edits)",
-    "  • User-requested timers (countdowns, pomodoros)",
-    "  • Estimate duration and start a countDown clock at task beginning",
-    "- Skip if user says not to sync, or if the task is only about focus_* tools themselves",
-    "- Follow user's explicit requests for specific poses/actions",
+    "When to use `focus_action`:",
+    "- Task start: User gives you a new task to work on",
+    "- Task switch: Moving from one distinct task to another",
+    "- Major milestone: Completed a significant phase",
+    "- Task end: Fully completed the user's request",
+    "- Skip for: Trivial operations (reading 1 file, simple grep)",
+    "",
+    "How to choose parameters:",
+    "- Choose poseType, action, and bubble that match your actual current activity",
+    "- Use available actions from the configured action list for each poseType",
+    "- bubble should be 2-5 words describing what you're doing now",
+    "",
+    "When to use `focus_clock`:",
+    "- Multi-step tasks: 3+ distinct operations (read files → edit → test → commit)",
+    "- Time-consuming: Operations likely taking 30+ seconds (builds, test suites, large searches)",
+    "- User requests: User explicitly asks for timer/pomodoro",
+    "- Estimate duration at task start, use countDown mode",
+    "- Skip for: Single file reads, simple edits, quick commands",
+    "",
+    "Skip all sync if:",
+    "- User says 'don't sync to Focus' or similar",
+    "- Task is only about configuring/testing focus_* tools",
+    "- User explicitly requests specific pose/action (follow their request exactly)",
   ].join("\n");
 }
 
