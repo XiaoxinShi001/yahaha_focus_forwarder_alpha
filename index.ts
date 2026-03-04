@@ -523,7 +523,7 @@ function buildFocusPrompt(): string {
     "- Task start: User gives you a new task to work on",
     "- Task switch: Moving from one distinct task to another",
     "- Major milestone: Completed a significant phase",
-    "- Task end: Fully completed the user's request",
+    "- Task end: MUST send focus_action when you finish the user's request and are about to reply with the final result",
     "- Skip for: Trivial operations (reading 1 file, simple grep)",
     "",
     "How to choose parameters:",
