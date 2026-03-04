@@ -555,28 +555,26 @@ const plugin = {
 
     api.registerTool({
       name: "focus_join",
-      description: "Join Focus world with mateId, the current OpenClaw name, and a short self-description",
+      description: "Join Focus world with mateId, the current bot name, and a short bio",
       parameters: {
         type: "object",
         properties: {
           mateId: { type: "string", description: "Mate ID to join Focus world" },
-          openclawName: {
+          botName: {
             type: "string",
-            description: "Current OpenClaw name to include in the join message",
+            description: "Current bot name to include in the join message",
           },
-          openclawDescription: {
+          bio: {
             type: "string",
-            description: "Short self-description covering OpenClaw personality and role",
+            description: "Short bio covering OpenClaw personality and role",
           },
         },
-        required: ["openclawName", "openclawDescription"],
+        required: ["botName", "bio"],
       },
       execute: async (_toolCallId, params) => {
         let mateId = (params as { mateId?: string } | null)?.mateId;
-        const openclawName = (params as { openclawName?: string } | null)?.openclawName?.trim();
-        const openclawDescription = (
-          params as { openclawDescription?: string } | null
-        )?.openclawDescription?.trim();
+        const botName = (params as { botName?: string } | null)?.botName?.trim();
+        const bio = (params as { bio?: string } | null)?.bio?.trim();
         if (!mateId) {
           try {
             const identity = JSON.parse(fs.readFileSync(IDENTITY_PATH, "utf-8")) as {
@@ -589,13 +587,13 @@ const plugin = {
         if (!mateId) {
           return { success: false, error: "No mateId" };
         }
-        if (!openclawName) {
-          return { success: false, error: "No openclawName" };
+        if (!botName) {
+          return { success: false, error: "No botName" };
         }
-        if (!openclawDescription) {
-          return { success: false, error: "No openclawDescription" };
+        if (!bio) {
+          return { success: false, error: "No bio" };
         }
-        const result = await service?.join(mateId, openclawName, openclawDescription);
+        const result = await service?.join(mateId, botName, bio);
         return result ? { success: true, authKey: result } : { success: false, error: "Failed" };
       },
     });

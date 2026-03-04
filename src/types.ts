@@ -36,8 +36,8 @@ export type FocusErrorResult = {
 export type JoinPayload = {
   type: "join";
   mateId: string;
-  openclawName: string;
-  openclawDescription: string;
+  botName: string;
+  bio: string;
 };
 
 export type JoinAckPayload = {

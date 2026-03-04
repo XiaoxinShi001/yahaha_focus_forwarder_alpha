@@ -57,14 +57,14 @@ export class FocusForwarderService {
 
   async join(
     mateId: string,
-    openclawName: string,
-    openclawDescription: string,
+    botName: string,
+    bio: string,
   ): Promise<string | null> {
     return new Promise((resolve) => {
       this.identity = { mateId };
       this.joinResolve = resolve;
       const sendJoin = () =>
-        this.ws?.send(JSON.stringify({ type: "join", mateId, openclawName, openclawDescription }));
+        this.ws?.send(JSON.stringify({ type: "join", mateId, botName, bio }));
       if (this.ws?.readyState === WebSocket.OPEN) {
         sendJoin();
       } else {
