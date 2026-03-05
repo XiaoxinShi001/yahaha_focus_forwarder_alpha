@@ -24,7 +24,7 @@ Save `mateId` to `identity.json` before using `focus_join`:
 Install and enable:
 
 ```bash
-openclaw plugins install @yahaha-studio/focus-forwarder@0.0.1-alpha.21
+openclaw plugins install @yahaha-studio/focus-forwarder@0.0.1-alpha.22
 openclaw plugins enable focus-forwarder
 ```
 
