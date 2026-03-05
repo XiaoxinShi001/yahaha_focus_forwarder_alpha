@@ -201,13 +201,7 @@ export class FocusForwarderService {
     try {
       if (!fs.existsSync(IDENTITY_PATH)) return null;
       const data = JSON.parse(fs.readFileSync(IDENTITY_PATH, "utf-8"));
-      // Validate required fields
-      const mateId =
-        typeof data.mateId === "string" && data.mateId
-          ? data.mateId
-          : typeof data.userId === "string" && data.userId
-            ? data.userId
-            : null;
+      const mateId = typeof data.mateId === "string" && data.mateId ? data.mateId : null;
       if (mateId) {
         return {
           mateId,

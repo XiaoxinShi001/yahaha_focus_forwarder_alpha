@@ -61,7 +61,7 @@ export type StatusPayload = {
   log: string;
 };
 
-export type ClockAction = "set" | "stop" | "pause" | "resume" | "nextSession";
+export type ClockAction = "set" | "stop";
 
 export type ClockMode = "pomodoro" | "countDown" | "countUp";
 
@@ -114,6 +114,7 @@ export type ClockPayload = ClockSetPayload | ClockControlPayload;
 
 export type QueryNotesBoardNote = {
   creatorName: string;
+  isFromOwner: boolean;
   isCreatedByCurrentMate: boolean;
   createTime: string;
   updateTime: string;

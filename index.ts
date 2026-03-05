@@ -193,7 +193,7 @@ function isPositiveInteger(value: unknown): value is number {
 }
 
 function isClockAction(value: unknown): value is ClockAction {
-  return ["set", "stop", "pause", "resume", "nextSession"].includes(String(value));
+  return ["set", "stop"].includes(String(value));
 }
 
 function isPomodoroPhase(value: unknown): value is PomodoroPhase {
@@ -591,9 +591,8 @@ const plugin = {
           try {
             const identity = JSON.parse(fs.readFileSync(IDENTITY_PATH, "utf-8")) as {
               mateId?: string;
-              userId?: string;
             };
-            mateId = identity.mateId ?? identity.userId;
+            mateId = identity.mateId;
           } catch {}
         }
         if (!mateId) {
@@ -680,13 +679,13 @@ const plugin = {
     api.registerTool({
       name: "focus_clock",
       description:
-        "Send clock commands to Focus world, including pomodoro, countdown, count-up, stop, pause, resume, and nextSession.",
+        "Send clock commands to Focus world. Supported actions are set and stop.",
       parameters: {
         type: "object",
         properties: {
           action: {
             type: "string",
-            description: "Clock action: set, stop, pause, resume, or nextSession",
+            description: "Clock action: set or stop",
           },
           requestId: {
             type: "string",
@@ -755,7 +754,7 @@ const plugin = {
         if (!isClockAction(action)) {
           return {
             success: false,
-            error: "action must be one of: set, stop, pause, resume, nextSession",
+            error: "action must be one of: set, stop",
           };
         }
         if (requestId !== undefined && typeof requestId !== "string") {
