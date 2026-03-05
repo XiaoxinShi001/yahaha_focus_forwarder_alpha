@@ -43,6 +43,11 @@ let service: FocusForwarderService | null = null;
 let pluginApi: OpenClawPluginApi | null = null;
 let coreApiPromise: Promise<{ runEmbeddedPiAgent?: (params: Record<string, unknown>) => Promise<any> }> | null =
   null;
+let lastKnownStatus: ActionResult = {
+  poseType: "sit",
+  action: DEFAULT_ACTIONS.sit[0],
+  bubble: "Working",
+};
 
 function sanitizeActions(value: unknown, fallback: string[]): string[] {
   if (!Array.isArray(value)) {
@@ -178,6 +183,100 @@ async function loadCoreApi(): Promise<{
 
 function truncateLog(text: string, maxLen = 150): string {
   return text.length > maxLen ? `${text.slice(0, maxLen)}...` : text;
+}
+
+function truncateInline(text: string, maxLen: number): string {
+  return text.length > maxLen ? `${text.slice(0, maxLen)}...` : text;
+}
+
+function stringifyParamsForLog(value: unknown, maxLen = 220): string {
+  if (value === undefined) {
+    return "{}";
+  }
+  try {
+    return truncateInline(JSON.stringify(value), maxLen);
+  } catch {
+    return truncateInline(String(value), maxLen);
+  }
+}
+
+function rememberStatus(status: ActionResult): void {
+  lastKnownStatus = {
+    poseType: status.poseType,
+    action: status.action,
+    bubble: status.bubble.trim() || status.action,
+  };
+}
+
+function sendStatusAndRemember(status: ActionResult, log: string): void {
+  rememberStatus(status);
+  service?.sendStatus(status.poseType, status.action, status.bubble || status.action, log);
+}
+
+function forwardToolCallLog(toolName: string, params: unknown, agentId?: string): void {
+  if (!service?.hasValidIdentity() || !service?.isConnected()) {
+    return;
+  }
+
+  if (!toolName || toolName === "focus_action") {
+    return;
+  }
+
+  const paramsText = stringifyParamsForLog(params);
+  const bubble = lastKnownStatus.bubble.trim() || lastKnownStatus.action;
+  const prefix = typeof agentId === "string" && agentId.trim() ? `[${agentId.trim()}] ` : "";
+  const log = truncateLog(`${prefix}exec tool: ${toolName}, params: ${paramsText}`, 300);
+  service.sendStatus(lastKnownStatus.poseType, lastKnownStatus.action, bubble, log);
+}
+
+function resolveStatusSourceId(ctx?: { agentId?: string; sessionKey?: string }): string | undefined {
+  if (typeof ctx?.agentId === "string" && ctx.agentId.trim()) {
+    return ctx.agentId.trim();
+  }
+  if (typeof ctx?.sessionKey === "string" && ctx.sessionKey.trim()) {
+    return ctx.sessionKey.trim();
+  }
+  return undefined;
+}
+
+async function handleMessageReceivedHook(
+  event: any,
+  ctx?: { agentId?: string; sessionKey?: string },
+): Promise<void> {
+  if (!service?.hasValidIdentity() || !service?.isConnected()) {
+    return;
+  }
+
+  const sourceId = resolveStatusSourceId(ctx);
+  const content =
+    typeof event?.content === "string" && event.content.trim()
+      ? event.content.trim()
+      : JSON.stringify(event ?? "new message");
+  const context = `${sourceId ? `[${sourceId}] ` : ""}Received: ${content}`;
+  const status = isLlmEnabled()
+    ? await pickActionWithLlm(context)
+    : buildMessageFallbackStatus(context);
+
+  sendStatusAndRemember(status, truncateLog(context));
+}
+
+function registerPluginHooks(api: OpenClawPluginApi): void {
+  api.on("before_prompt_build", () => {
+    if (!service?.hasValidIdentity() || !service?.isConnected() || !isLlmEnabled()) {
+      return;
+    }
+    return {
+      prependContext: buildFocusPrompt(),
+    };
+  });
+
+  api.on("before_tool_call", (event, ctx) => {
+    forwardToolCallLog(event.toolName, event.params, ctx?.agentId);
+  });
+
+  api.on("message_received", async (event, ctx) => {
+    await handleMessageReceivedHook(event, ctx);
+  });
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -553,6 +652,7 @@ const plugin = {
 
   register(api: OpenClawPluginApi) {
     pluginApi = api;
+    registerPluginHooks(api);
 
     api.registerService({
       id: "focus-forwarder",
@@ -667,7 +767,15 @@ const plugin = {
         }
 
         const bubbleText = typeof bubble === "string" && bubble.trim() ? bubble.trim() : matched;
-        service.sendStatus(normalizedPoseType, matched, bubbleText, `Focus action: ${bubbleText}`);
+        // Keep explicit focus_action sync free of tool/log noise.
+        sendStatusAndRemember(
+          {
+            poseType: normalizedPoseType,
+            action: matched,
+            bubble: bubbleText,
+          },
+          "",
+        );
         return {
           success: true,
           poseType: normalizedPoseType,
@@ -946,37 +1054,6 @@ const plugin = {
       },
     });
 
-    api.on("before_prompt_build", () => {
-      if (!service?.hasValidIdentity() || !service?.isConnected() || !isLlmEnabled()) {
-        return;
-      }
-      return {
-        prependContext: buildFocusPrompt(),
-      };
-    });
-
-    api.on("message_received", async (event: any, ctx?: { agentId?: string; sessionKey?: string }) => {
-      if (!service?.hasValidIdentity() || !service?.isConnected()) {
-        return;
-      }
-
-      const agentId = ctx?.agentId || ctx?.sessionKey || "main";
-      const content =
-        typeof event?.content === "string" && event.content.trim()
-          ? event.content.trim()
-          : JSON.stringify(event ?? "new message");
-      const context = `[${agentId}] Received: ${content}`;
-      const status = isLlmEnabled()
-        ? await pickActionWithLlm(context)
-        : buildMessageFallbackStatus(context);
-
-      service.sendStatus(
-        status.poseType,
-        status.action,
-        status.bubble || status.action,
-        truncateLog(context),
-      );
-    });
   },
 };
 
