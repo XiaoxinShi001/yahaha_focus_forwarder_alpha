@@ -189,6 +189,15 @@ function truncateInline(text: string, maxLen: number): string {
   return text.length > maxLen ? `${text.slice(0, maxLen)}...` : text;
 }
 
+function prefixLogTimestamp(log: string): string {
+  const trimmed = log.trim();
+  if (!trimmed) {
+    return "";
+  }
+  const timestamp = new Date().toISOString().replace("T", " ");
+  return `[${timestamp}] ${trimmed}`;
+}
+
 function stringifyParamsForLog(value: unknown, maxLen = 220): string {
   if (value === undefined) {
     return "{}";
@@ -210,7 +219,12 @@ function rememberStatus(status: ActionResult): void {
 
 function sendStatusAndRemember(status: ActionResult, log: string): void {
   rememberStatus(status);
-  service?.sendStatus(status.poseType, status.action, status.bubble || status.action, log);
+  service?.sendStatus(
+    status.poseType,
+    status.action,
+    status.bubble || status.action,
+    prefixLogTimestamp(log),
+  );
 }
 
 function forwardToolCallLog(toolName: string, params: unknown, agentId?: string): void {
@@ -226,7 +240,7 @@ function forwardToolCallLog(toolName: string, params: unknown, agentId?: string)
   const bubble = lastKnownStatus.bubble.trim() || lastKnownStatus.action;
   const prefix = typeof agentId === "string" && agentId.trim() ? `[${agentId.trim()}] ` : "";
   const log = truncateLog(`${prefix}exec tool: ${toolName}, params: ${paramsText}`, 300);
-  service.sendStatus(lastKnownStatus.poseType, lastKnownStatus.action, bubble, log);
+  service.sendStatus(lastKnownStatus.poseType, lastKnownStatus.action, bubble, prefixLogTimestamp(log));
 }
 
 function resolveStatusSourceId(ctx?: { agentId?: string; sessionKey?: string }): string | undefined {
