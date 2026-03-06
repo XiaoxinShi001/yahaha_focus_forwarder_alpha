@@ -83,7 +83,8 @@ When task activity should be reflected in Focus status:
 1. Task start: before substantial work, call `focus_action` once.
 2. Task switch: if work topic changes materially, call `focus_action`.
 3. Major milestone: after finishing a significant phase, call `focus_action`.
-4. Task end: before final user-visible reply, call `focus_action` once.
+4. Task end (highest priority): before final user-visible reply, call `focus_action` exactly once.
+5. Required order at task end: 1) call `focus_action` 2) send final reply.
 
 Skip lifecycle sync when task is only about configuring/testing `focus_*` tools.
 
