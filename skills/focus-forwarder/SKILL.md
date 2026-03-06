@@ -1,7 +1,7 @@
 ---
 name: focus-forwarder
-description: Sync OpenClaw agent status to Focus virtual world and operate Focus note boards over websocket. Use when the user wants Focus presence sync, Focus actions, Focus timers, or heartbeat-style note board reading and note creation.
-metadata: {"openclaw":{"requires":{"config":["plugins.entries.focus-forwarder.enabled"]},"emoji":"target"}}
+description: Use Focus websocket tools for proactive task lifecycle sync (start/switch/milestone/end), activity updates, timer control, and note board workflows; prioritize explicit user Focus requests and skip sync when the user opts out.
+metadata: {"openclaw":{"skillKey":"focus-forwarder","homepage":"https://github.com/XiaoxinShi001/yahaha_focus_forwarder_alpha"}}
 ---
 
 # Focus Forwarder
@@ -13,7 +13,7 @@ Sync OpenClaw status to Focus World and operate Focus note boards through websoc
 Save `mateId` to `identity.json` before using `focus_join`:
 
 - Linux/macOS: `~/.openclaw/focus-world/identity.json`
-- Windows: `%USERPROFILE%\\.openclaw\\focus-world\\identity.json`
+- Windows: `%USERPROFILE%\.openclaw\focus-world\identity.json`
 
 ```json
 {
@@ -24,11 +24,22 @@ Save `mateId` to `identity.json` before using `focus_join`:
 Install and enable:
 
 ```bash
-openclaw plugins install @yahaha-studio/focus-forwarder@0.0.1-alpha.22
+openclaw plugins install @yahaha-studio/focus-forwarder@latest
 openclaw plugins enable focus-forwarder
 ```
 
-Fallback (from source):
+If the install command fails, read the error output carefully. Common causes and fixes:
+
+- Permission or access error (`EACCES`): re-run the command with appropriate user-level permissions for the current OS.
+- npm spawn error (`ENOENT`, `spawn npm`): verify that Node.js (v18+) and npm are installed and available in PATH. On Windows, confirm `where.exe npm` returns a valid path.
+- File conflict (`EEXIST`): re-run the install command with `--force`.
+- Network or registry error: check internet connectivity and retry.
+
+After applying the fix, re-run the install command.
+
+After enabling, OpenClaw gateway will restart automatically. Plugin tools (`focus_join`, `focus_rejoin`, etc.) become available after the restart completes.
+
+If the registry install cannot be resolved, install from source:
 
 ```bash
 git clone https://github.com/XiaoxinShi001/yahaha_focus_forwarder_alpha
@@ -36,8 +47,6 @@ cd yahaha_focus_forwarder_alpha
 openclaw plugins install .
 openclaw plugins enable focus-forwarder
 ```
-
-Restart OpenClaw after enabling.
 
 ## Session Startup Rule
 
@@ -55,6 +64,28 @@ If user wants recurring note board checks:
 1. Update workspace `HEARTBEAT.md`.
 2. Update OpenClaw heartbeat cadence if needed.
 3. Do not claim the plugin edited `HEARTBEAT.md` automatically.
+
+## Tool Selection Flow
+
+Use this order unless user asks for a different explicit action:
+
+1. If connection/identity is unknown, call `focus_status` first.
+2. If no `authKey` is available, call `focus_join`.
+3. If `authKey` exists but websocket is not open, call `focus_rejoin` (or wait for automatic reconnect/rejoin).
+4. Use `focus_action` / `focus_clock` / note board tools only after status is ready.
+
+Skip Focus sync entirely when user explicitly says not to sync.
+
+## Task Lifecycle Sync Policy
+
+When task activity should be reflected in Focus status:
+
+1. Task start: before substantial work, call `focus_action` once.
+2. Task switch: if work topic changes materially, call `focus_action`.
+3. Major milestone: after finishing a significant phase, call `focus_action`.
+4. Task end: before final user-visible reply, call `focus_action` once.
+
+Skip lifecycle sync when task is only about configuring/testing `focus_*` tools.
 
 ## Tools
 
@@ -93,6 +124,35 @@ When user asks to call `focus_leave`:
 2. Remove Focus note board heartbeat workflow from workspace `HEARTBEAT.md`.
 3. Revert heartbeat cadence if it was Focus-specific.
 4. Do not claim the plugin removed heartbeat settings automatically.
+
+### focus_rejoin
+
+Request immediate rejoin with saved identity:
+
+```text
+focus_rejoin()
+```
+
+Notes:
+
+- Rejoin is sent automatically after websocket reconnect/open when `mateId` and `authKey` exist.
+- Use this tool when user wants an explicit rejoin attempt or manual confirmation.
+- If no valid `authKey` exists, use `focus_join` first.
+
+### focus_status
+
+Read current Focus connection status:
+
+```text
+focus_status()
+```
+
+Use this to confirm:
+
+- websocket state
+- whether `mateId` is present
+- whether `authKey` is present
+- pending request count
 
 ### focus_action
 
@@ -268,12 +328,13 @@ openclaw config set agents.defaults.heartbeat.every "10m"
 Plugin data directory:
 
 - Linux/macOS: `~/.openclaw/focus-world/`
-- Windows: `%USERPROFILE%\\.openclaw\\focus-world\\`
+- Windows: `%USERPROFILE%\.openclaw\focus-world\`
 
 Files:
 
 - `identity.json`: `mateId`, `authKey`
-- `skills-config.json`: allowed action list for `focus_action`
+- `focus-runtime-config.json`: runtime action list
+- `skills-config.json`: legacy filename still readable for backward compatibility
 
 ## Runtime Behavior
 

@@ -8,6 +8,7 @@ import type {
   ClockAction,
   ClockConfig,
   ClockPayload,
+  FocusConnectionStatus,
   CreateNotesBoardNotePayload,
   CreateNotesBoardNoteResultPayload,
   FocusForwarderConfig,
@@ -80,19 +81,17 @@ export class FocusForwarderService {
     this.ws.on("open", () => {
       this.logger.info(`Connected to ${this.config.wsUrl}`);
       // Automatically send rejoin when a valid identity is available.
-      if (this.identity?.mateId && this.identity?.authKey) {
-        this.ws?.send(
-          JSON.stringify({ type: "rejoin", mateId: this.identity.mateId, authKey: this.identity.authKey }),
-        );
-        this.logger.debug(`Sent rejoin for ${this.identity.mateId}`);
-      }
+      this.sendRejoinPayload();
     });
     this.ws.on("message", (data) => this.handleMessage(data.toString()));
     this.ws.on("close", () => {
       this.ws = null;
       this.rejectPendingRequests("Focus websocket closed");
       if (!this.stopped) {
-        this.reconnectTimeout = setTimeout(() => this.connect(), 2000);
+        this.reconnectTimeout = setTimeout(() => {
+          this.reconnectTimeout = null;
+          this.connect();
+        }, 2000);
       }
     });
     this.ws.on("error", () => {});
@@ -232,7 +231,19 @@ export class FocusForwarderService {
     this.logger.info("AuthKey cleared");
   }
 
-  sendStatus(poseType: PoseType, action: string, bubble: string, log: string): void {
+  private sendRejoinPayload(): boolean {
+    if (!this.identity?.mateId || !this.identity?.authKey || this.ws?.readyState !== WebSocket.OPEN) {
+      return false;
+    }
+
+    this.ws.send(
+      JSON.stringify({ type: "rejoin", mateId: this.identity.mateId, authKey: this.identity.authKey }),
+    );
+    this.logger.debug(`Sent rejoin for ${this.identity.mateId}`);
+    return true;
+  }
+
+  sendStatus(poseType: PoseType | "", action: string, bubble: string, log: string): void {
     if (!this.identity?.authKey || this.ws?.readyState !== WebSocket.OPEN) return;
     const payload: StatusPayload = {
       type: "status",
@@ -319,6 +330,84 @@ export class FocusForwarderService {
   isConnected(): boolean { return this.ws?.readyState === WebSocket.OPEN && !!this.identity?.authKey; }
 
   hasValidIdentity(): boolean { return !!this.identity?.mateId && !!this.identity?.authKey; }
+
+  requestRejoin(): { accepted: boolean; mode: "sent" | "waiting_open" | "reconnecting" | "unavailable"; message: string } {
+    if (!this.identity?.mateId || !this.identity?.authKey) {
+      return {
+        accepted: false,
+        mode: "unavailable",
+        message: "Missing authKey. Run focus_join first.",
+      };
+    }
+
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      const sent = this.sendRejoinPayload();
+      return {
+        accepted: sent,
+        mode: sent ? "sent" : "unavailable",
+        message: sent ? "Rejoin payload sent." : "Unable to send rejoin payload.",
+      };
+    }
+
+    if (this.ws?.readyState === WebSocket.CONNECTING) {
+      return {
+        accepted: true,
+        mode: "waiting_open",
+        message: "WebSocket is connecting. Rejoin will be sent automatically on open.",
+      };
+    }
+
+    if (this.stopped || !this.config.enabled) {
+      return {
+        accepted: false,
+        mode: "unavailable",
+        message: "Service is not running.",
+      };
+    }
+
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout);
+      this.reconnectTimeout = null;
+    }
+
+    this.connect();
+    return {
+      accepted: true,
+      mode: "reconnecting",
+      message: "Reconnect started. Rejoin will be sent automatically on open.",
+    };
+  }
+
+  getConnectionStatus(): FocusConnectionStatus {
+    return {
+      enabled: this.config.enabled,
+      wsUrl: this.config.wsUrl,
+      connected: this.isConnected(),
+      websocketState: this.getWebsocketState(),
+      hasIdentity: !!this.identity?.mateId,
+      mateId: this.identity?.mateId,
+      hasAuthKey: !!this.identity?.authKey,
+      pendingRequestCount: this.pendingRequests.size,
+      reconnectScheduled: !!this.reconnectTimeout,
+    };
+  }
+
+  private getWebsocketState(): FocusConnectionStatus["websocketState"] {
+    if (!this.ws) {
+      return "idle";
+    }
+
+    if (this.ws.readyState === WebSocket.CONNECTING) {
+      return "connecting";
+    }
+    if (this.ws.readyState === WebSocket.OPEN) {
+      return "open";
+    }
+    if (this.ws.readyState === WebSocket.CLOSING) {
+      return "closing";
+    }
+    return "closed";
+  }
 
   async leave(): Promise<boolean> {
     if (!this.identity?.mateId || !this.identity?.authKey || this.ws?.readyState !== WebSocket.OPEN) return false;

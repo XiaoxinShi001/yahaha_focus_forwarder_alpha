@@ -11,16 +11,28 @@ export type ActionResult = {
   bubble: string;
 };
 
-export type SkillsConfig = {
+export type FocusRuntimeConfig = {
   actions: Record<PoseType, string[]>;
-  llm: {
-    enabled: boolean;
-  };
 };
+
+// Backward-compatible alias for older imports.
+export type SkillsConfig = FocusRuntimeConfig;
 
 export type FocusIdentity = {
   mateId: string;
   authKey?: string;
+};
+
+export type FocusConnectionStatus = {
+  enabled: boolean;
+  wsUrl: string;
+  connected: boolean;
+  websocketState: "idle" | "connecting" | "open" | "closing" | "closed";
+  hasIdentity: boolean;
+  mateId?: string;
+  hasAuthKey: boolean;
+  pendingRequestCount: number;
+  reconnectScheduled: boolean;
 };
 
 export type FocusErrorResult = {
@@ -55,7 +67,7 @@ export type StatusPayload = {
   type: "status";
   mateId: string;
   authKey: string;
-  poseType: PoseType;
+  poseType: PoseType | "";
   action: string;
   bubble: string;
   log: string;
