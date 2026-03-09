@@ -3,46 +3,46 @@ import os from "node:os";
 import path from "node:path";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
 import { parse } from "./src/config.js";
-import { FocusForwarderService } from "./src/service.js";
+import { KichiForwarderService } from "./src/service.js";
 import type {
   ActionResult,
   ClockAction,
   ClockConfig,
   CreateNotesBoardNote,
   CreateNotesBoardNoteResultPayload,
-  FocusRuntimeConfig,
-  FocusForwarderConfig,
+  KichiRuntimeConfig,
+  KichiForwarderConfig,
   PomodoroPhase,
   PoseType,
 } from "./src/types.js";
 
-const DEFAULT_ACTIONS: FocusRuntimeConfig["actions"] = {
+const DEFAULT_ACTIONS: KichiRuntimeConfig["actions"] = {
   stand: ["High Five", "Listen Music", "Arms Crossed", "Epiphany", "Yay", "Tired", "Wait"],
   sit: ["Typing with Keyboard", "Thinking", "Study Look At", "Writing", "Hand Cramp", "Laze"],
   lay: ["Rest Chin", "Lie Flat", "Lie Face Down"],
   floor: ["Seiza", "Cross Legged", "Knee Hug"],
 };
 
-const DEFAULT_RUNTIME_CONFIG: FocusRuntimeConfig = {
+const DEFAULT_RUNTIME_CONFIG: KichiRuntimeConfig = {
   actions: DEFAULT_ACTIONS,
 };
 
-const FOCUS_WORLD_DIR = path.join(os.homedir(), ".openclaw", "focus-world");
-const RUNTIME_CONFIG_PATH = path.join(FOCUS_WORLD_DIR, "focus-runtime-config.json");
-const LEGACY_SKILLS_CONFIG_PATH = path.join(FOCUS_WORLD_DIR, "skills-config.json");
-const IDENTITY_PATH = path.join(FOCUS_WORLD_DIR, "identity.json");
+const KICHI_WORLD_DIR = path.join(os.homedir(), ".openclaw", "kichi-world");
+const RUNTIME_CONFIG_PATH = path.join(KICHI_WORLD_DIR, "kichi-runtime-config.json");
+const LEGACY_SKILLS_CONFIG_PATH = path.join(KICHI_WORLD_DIR, "skills-config.json");
+const IDENTITY_PATH = path.join(KICHI_WORLD_DIR, "identity.json");
 const MAX_NOTEBOARD_TEXT_LENGTH = 200;
 const MESSAGE_RECEIVED_BUBBLES = [
-  "(`･ω･′)ゞ",
-  "(￣^￣)ゞ",
-  "(〃･ิ‿･ิ)ゞ",
-  "(≧∀≦)ゞ",
+  "(`･ω･�?�?,
+  "(￣^�?�?,
+  "(〃･ิ‿･�?�?,
+  "(≧∀�?�?,
 ];
 
-let cachedConfig: FocusRuntimeConfig | null = null;
+let cachedConfig: KichiRuntimeConfig | null = null;
 let cachedConfigMtime = 0;
 let cachedConfigPath = "";
-let service: FocusForwarderService | null = null;
+let service: KichiForwarderService | null = null;
 let pluginApi: OpenClawPluginApi | null = null;
 let lastKnownStatus: ActionResult = {
   poseType: "sit",
@@ -60,8 +60,8 @@ function sanitizeActions(value: unknown, fallback: string[]): string[] {
   return actions.length > 0 ? actions : fallback;
 }
 
-function normalizeRuntimeConfig(value: unknown): FocusRuntimeConfig {
-  const raw = value && typeof value === "object" ? (value as Partial<FocusRuntimeConfig>) : {};
+function normalizeRuntimeConfig(value: unknown): KichiRuntimeConfig {
+  const raw = value && typeof value === "object" ? (value as Partial<KichiRuntimeConfig>) : {};
   const actions = raw.actions;
   return {
     actions: {
@@ -83,7 +83,7 @@ function resolveRuntimeConfigPath(): string | null {
   return null;
 }
 
-function updateCachedRuntimeConfig(config: FocusRuntimeConfig, sourcePath: string | null): FocusRuntimeConfig {
+function updateCachedRuntimeConfig(config: KichiRuntimeConfig, sourcePath: string | null): KichiRuntimeConfig {
   cachedConfig = config;
   cachedConfigPath = sourcePath ?? "";
   try {
@@ -96,7 +96,7 @@ function updateCachedRuntimeConfig(config: FocusRuntimeConfig, sourcePath: strin
   return config;
 }
 
-function loadRuntimeConfig(): FocusRuntimeConfig {
+function loadRuntimeConfig(): KichiRuntimeConfig {
   try {
     const configPath = resolveRuntimeConfigPath();
     if (configPath) {
@@ -105,12 +105,12 @@ function loadRuntimeConfig(): FocusRuntimeConfig {
         const raw = fs.readFileSync(configPath, "utf-8");
         updateCachedRuntimeConfig(normalizeRuntimeConfig(JSON.parse(raw)), configPath);
         const sourceName = path.basename(configPath);
-        pluginApi?.logger.debug(`[focus] loaded runtime config from ${sourceName}`);
+        pluginApi?.logger.debug(`[kichi] loaded runtime config from ${sourceName}`);
       }
       return cachedConfig!;
     }
   } catch (error) {
-    pluginApi?.logger.warn(`[focus] failed to load runtime config: ${error}`);
+    pluginApi?.logger.warn(`[kichi] failed to load runtime config: ${error}`);
   }
   return updateCachedRuntimeConfig(DEFAULT_RUNTIME_CONFIG, null);
 }
@@ -166,7 +166,7 @@ function forwardToolCallLog(toolName: string, params: unknown, agentId?: string)
     return;
   }
 
-  if (!toolName || toolName === "focus_action") {
+  if (!toolName || toolName === "kichi_action") {
     return;
   }
 
@@ -211,7 +211,7 @@ function registerPluginHooks(api: OpenClawPluginApi): void {
       return;
     }
     return {
-      prependContext: buildFocusPrompt(),
+      prependContext: buildKichiPrompt(),
     };
   });
 
@@ -241,12 +241,12 @@ function isClockAction(value: unknown): value is ClockAction {
 }
 
 function isPomodoroPhase(value: unknown): value is PomodoroPhase {
-  return ["focusing", "shortBreak", "longBreak"].includes(String(value));
+  return ["kichiing", "shortBreak", "longBreak"].includes(String(value));
 }
 
 function getPomodoroPhaseDuration(
   phase: PomodoroPhase,
-  focusSeconds: number,
+  kichiSeconds: number,
   shortBreakSeconds: number,
   longBreakSeconds: number,
 ): number {
@@ -256,7 +256,7 @@ function getPomodoroPhaseDuration(
   if (phase === "longBreak") {
     return longBreakSeconds;
   }
-  return focusSeconds;
+  return kichiSeconds;
 }
 
 function normalizeClockConfig(value: unknown): { clock?: ClockConfig; error?: string } {
@@ -272,15 +272,15 @@ function normalizeClockConfig(value: unknown): { clock?: ClockConfig; error?: st
   const running = typeof value.running === "boolean" ? value.running : true;
 
   if (mode === "pomodoro") {
-    const focusSeconds = value.focusSeconds;
+    const kichiSeconds = value.kichiSeconds;
     const shortBreakSeconds = value.shortBreakSeconds;
     const longBreakSeconds = value.longBreakSeconds;
     const sessionCount = value.sessionCount;
     const currentSession = value.currentSession ?? 1;
-    const phase = value.phase ?? "focusing";
+    const phase = value.phase ?? "kichiing";
 
-    if (!isPositiveInteger(focusSeconds)) {
-      return { error: "clock.focusSeconds must be a positive integer" };
+    if (!isPositiveInteger(kichiSeconds)) {
+      return { error: "clock.kichiSeconds must be a positive integer" };
     }
     if (!isPositiveInteger(shortBreakSeconds)) {
       return { error: "clock.shortBreakSeconds must be a positive integer" };
@@ -298,12 +298,12 @@ function normalizeClockConfig(value: unknown): { clock?: ClockConfig; error?: st
       return { error: "clock.currentSession cannot be greater than clock.sessionCount" };
     }
     if (!isPomodoroPhase(phase)) {
-      return { error: "clock.phase must be focusing, shortBreak, or longBreak" };
+      return { error: "clock.phase must be kichiing, shortBreak, or longBreak" };
     }
 
     const defaultRemainingSeconds = getPomodoroPhaseDuration(
       phase,
-      focusSeconds,
+      kichiSeconds,
       shortBreakSeconds,
       longBreakSeconds,
     );
@@ -316,7 +316,7 @@ function normalizeClockConfig(value: unknown): { clock?: ClockConfig; error?: st
       clock: {
         mode: "pomodoro",
         running,
-        focusSeconds,
+        kichiSeconds,
         shortBreakSeconds,
         longBreakSeconds,
         sessionCount,
@@ -403,16 +403,16 @@ function buildMutationSummary(result: CreateNotesBoardNoteResultPayload): string
   return `${result.propId} -> ${result.note.id} by ${result.note.ownerName}: ${text}`;
 }
 
-function buildFocusPrompt(): string {
+function buildKichiPrompt(): string {
   return [
-    "Focus App status sync is available via `focus_action` and `focus_clock`.",
+    "Kichi App status sync is available via `kichi_action` and `kichi_clock`.",
     "",
-    "When to use `focus_action`:",
+    "When to use `kichi_action`:",
     "- Task start: User gives you a new task to work on",
     "- Task switch: Moving from one distinct task to another",
     "- Major milestone: Completed a significant phase",
-    "- Task end (highest priority): Before the final user-visible reply of this turn, MUST call `focus_action` exactly once",
-    "- Required order at task end: 1) call `focus_action` 2) send final reply",
+    "- Task end (highest priority): Before the final user-visible reply of this turn, MUST call `kichi_action` exactly once",
+    "- Required order at task end: 1) call `kichi_action` 2) send final reply",
     "- Trivial-operation skip applies only to Task start / Task switch / Major milestone, NOT Task end",
     "",
     "How to choose parameters:",
@@ -420,7 +420,7 @@ function buildFocusPrompt(): string {
     "- Use available actions from the configured action list for each poseType",
     "- bubble should be 2-5 words describing what you're doing now",
     "",
-    "When to use `focus_clock`:",
+    "When to use `kichi_clock`:",
     "- Default behavior: For most tasks, set a `countDown` at task start to plan your time.",
     "- Prefer using it whenever work has 2+ steps or is likely to take more than a brief moment (~10s).",
     "- If duration is uncertain, start with a reasonable estimate and adjust as work progresses.",
@@ -428,17 +428,17 @@ function buildFocusPrompt(): string {
     "- Skip only for truly quick one-shot operations (for example a single file read or one simple command).",
     "",
     "Skip all sync if:",
-    "- User says 'don't sync to Focus' or similar",
-    "- Task is only about configuring/testing focus_* tools",
+    "- User says 'don't sync to Kichi' or similar",
+    "- Task is only about configuring/testing kichi_* tools",
     "- User explicitly requests specific pose/action (follow their request exactly)",
     "When user instructions conflict with defaults, follow user instructions first.",
-    "For detailed policies and workflow, follow the `focus-forwarder` skill instructions.",
+    "For detailed policies and workflow, follow the `kichi-forwarder` skill instructions.",
   ].join("\n");
 }
 
 const plugin = {
-  id: "focus-forwarder",
-  name: "Focus Forwarder",
+  id: "kichi-forwarder",
+  name: "Kichi Forwarder",
   configSchema: { parse },
 
   register(api: OpenClawPluginApi) {
@@ -446,24 +446,24 @@ const plugin = {
     registerPluginHooks(api);
 
     api.registerService({
-      id: "focus-forwarder",
+      id: "kichi-forwarder",
       start: (ctx) => {
         const cfg = parse(
-          ctx.config.plugins?.entries?.["focus-forwarder"]?.config,
-        ) as FocusForwarderConfig;
-        service = new FocusForwarderService(cfg, api.logger);
+          ctx.config.plugins?.entries?.["kichi-forwarder"]?.config,
+        ) as KichiForwarderConfig;
+        service = new KichiForwarderService(cfg, api.logger);
         return service.start();
       },
       stop: () => service?.stop(),
     });
 
     api.registerTool({
-      name: "focus_join",
-      description: "Join Focus world with mateId, the current bot name, and a short bio",
+      name: "kichi_join",
+      description: "Join Kichi world with mateId, the current bot name, and a short bio",
       parameters: {
         type: "object",
         properties: {
-          mateId: { type: "string", description: "Mate ID to join Focus world" },
+          mateId: { type: "string", description: "Mate ID to join Kichi world" },
           botName: {
             type: "string",
             description: "Current bot name to include in the join message",
@@ -502,13 +502,13 @@ const plugin = {
     });
 
     api.registerTool({
-      name: "focus_rejoin",
+      name: "kichi_rejoin",
       description:
         "Request an immediate rejoin attempt with saved mateId/authKey. Rejoin is also sent automatically after reconnect.",
       parameters: { type: "object", properties: {} },
       execute: async () => {
         if (!service) {
-          return { success: false, error: "Focus service is not initialized" };
+          return { success: false, error: "Kichi service is not initialized" };
         }
 
         const result = service.requestRejoin();
@@ -521,8 +521,8 @@ const plugin = {
     });
 
     api.registerTool({
-      name: "focus_leave",
-      description: "Leave Focus world",
+      name: "kichi_leave",
+      description: "Leave Kichi world",
       parameters: { type: "object", properties: {} },
       execute: async () => {
         const result = await service?.leave();
@@ -531,12 +531,12 @@ const plugin = {
     });
 
     api.registerTool({
-      name: "focus_status",
-      description: "Read current Focus connection status and identity readiness",
+      name: "kichi_status",
+      description: "Read current Kichi connection status and identity readiness",
       parameters: { type: "object", properties: {} },
       execute: async () => {
         if (!service) {
-          return { success: false, error: "Focus service is not initialized" };
+          return { success: false, error: "Kichi service is not initialized" };
         }
         return {
           success: true,
@@ -546,9 +546,9 @@ const plugin = {
     });
 
     api.registerTool({
-      name: "focus_action",
+      name: "kichi_action",
       description:
-        "Send an action/pose to Focus world. Use this for explicit Focus actions and task lifecycle sync.",
+        "Send an action/pose to Kichi world. Use this for explicit Kichi actions and task lifecycle sync.",
       parameters: {
         type: "object",
         properties: {
@@ -577,7 +577,7 @@ const plugin = {
           };
         }
         if (!service?.hasValidIdentity() || !service?.isConnected()) {
-          return { success: false, error: "Not connected to Focus world" };
+          return { success: false, error: "Not connected to Kichi world" };
         }
 
         const normalizedPoseType = poseType as PoseType;
@@ -592,7 +592,7 @@ const plugin = {
         }
 
         const bubbleText = typeof bubble === "string" && bubble.trim() ? bubble.trim() : matched;
-        // Keep explicit focus_action sync free of tool/log noise.
+        // Keep explicit kichi_action sync free of tool/log noise.
         sendStatusAndRemember(
           {
             poseType: normalizedPoseType,
@@ -611,9 +611,9 @@ const plugin = {
     });
 
     api.registerTool({
-      name: "focus_clock",
+      name: "kichi_clock",
       description:
-        "Send clock commands to Focus world. Supported actions are set and stop.",
+        "Send clock commands to Kichi world. Supported actions are set and stop.",
       parameters: {
         type: "object",
         properties: {
@@ -637,9 +637,9 @@ const plugin = {
                 type: "boolean",
                 description: "Optional running state. Defaults to true.",
               },
-              focusSeconds: {
+              kichiSeconds: {
                 type: "number",
-                description: "Pomodoro focus duration in seconds",
+                description: "Pomodoro kichi duration in seconds",
               },
               shortBreakSeconds: {
                 type: "number",
@@ -651,7 +651,7 @@ const plugin = {
               },
               sessionCount: {
                 type: "number",
-                description: "Pomodoro total focus sessions before long break",
+                description: "Pomodoro total kichi sessions before long break",
               },
               currentSession: {
                 type: "number",
@@ -659,7 +659,7 @@ const plugin = {
               },
               phase: {
                 type: "string",
-                description: "Pomodoro phase: focusing, shortBreak, or longBreak",
+                description: "Pomodoro phase: kichiing, shortBreak, or longBreak",
               },
               durationSeconds: {
                 type: "number",
@@ -696,7 +696,7 @@ const plugin = {
         }
         const normalizedRequestId = typeof requestId === "string" ? requestId : undefined;
         if (!service?.hasValidIdentity() || !service?.isConnected()) {
-          return { success: false, error: "Not connected to Focus world" };
+          return { success: false, error: "Not connected to Kichi world" };
         }
 
         let normalizedClock: ClockConfig | undefined;
@@ -723,9 +723,9 @@ const plugin = {
     });
 
     api.registerTool({
-      name: "focus_noteboard_query",
+      name: "kichi_noteboard_query",
       description:
-        "Query Focus note boards for the current mate. Use this before creating a new note, especially when you may want to relate it to an existing note.",
+        "Query Kichi note boards for the current mate. Use this before creating a new note, especially when you may want to relate it to an existing note.",
       parameters: {
         type: "object",
         properties: {
@@ -741,7 +741,7 @@ const plugin = {
           return { success: false, error: "requestId must be a string when provided" };
         }
         if (!service?.hasValidIdentity() || !service?.isConnected()) {
-          return { success: false, error: "Not connected to Focus world" };
+          return { success: false, error: "Not connected to Kichi world" };
         }
 
         try {
@@ -759,9 +759,9 @@ const plugin = {
     });
 
     api.registerTool({
-      name: "focus_noteboard_create",
+      name: "kichi_noteboard_create",
       description:
-        "Create a new note on a specific Focus note board. Prefer querying first so you can avoid duplicate posts and respect rate limits.",
+        "Create a new note on a specific Kichi note board. Prefer querying first so you can avoid duplicate posts and respect rate limits.",
       parameters: {
         type: "object",
         properties: {
@@ -802,7 +802,7 @@ const plugin = {
           return { success: false, error: "requestId must be a string when provided" };
         }
         if (!service?.hasValidIdentity() || !service?.isConnected()) {
-          return { success: false, error: "Not connected to Focus world" };
+          return { success: false, error: "Not connected to Kichi world" };
         }
 
         try {

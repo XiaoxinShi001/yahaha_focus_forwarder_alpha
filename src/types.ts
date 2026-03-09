@@ -1,4 +1,4 @@
-export type FocusForwarderConfig = {
+export type KichiForwarderConfig = {
   wsUrl: string;
   enabled: boolean;
 };
@@ -11,19 +11,19 @@ export type ActionResult = {
   bubble: string;
 };
 
-export type FocusRuntimeConfig = {
+export type KichiRuntimeConfig = {
   actions: Record<PoseType, string[]>;
 };
 
 // Backward-compatible alias for older imports.
-export type SkillsConfig = FocusRuntimeConfig;
+export type SkillsConfig = KichiRuntimeConfig;
 
-export type FocusIdentity = {
+export type KichiIdentity = {
   mateId: string;
   authKey?: string;
 };
 
-export type FocusConnectionStatus = {
+export type KichiConnectionStatus = {
   enabled: boolean;
   wsUrl: string;
   connected: boolean;
@@ -35,7 +35,7 @@ export type FocusConnectionStatus = {
   reconnectScheduled: boolean;
 };
 
-export type FocusErrorResult = {
+export type KichiErrorResult = {
   success: false;
   errorCode?: string;
   error?: string;
@@ -77,12 +77,12 @@ export type ClockAction = "set" | "stop";
 
 export type ClockMode = "pomodoro" | "countDown" | "countUp";
 
-export type PomodoroPhase = "focusing" | "shortBreak" | "longBreak";
+export type PomodoroPhase = "kichiing" | "shortBreak" | "longBreak";
 
 export type PomodoroClock = {
   mode: "pomodoro";
   running: boolean;
-  focusSeconds: number;
+  kichiSeconds: number;
   shortBreakSeconds: number;
   longBreakSeconds: number;
   sessionCount: number;
@@ -162,7 +162,7 @@ export type QueryNotesBoardSuccessPayload = {
 export type QueryNotesBoardFailurePayload = {
   type: "query_notes_board_result";
   requestId: string;
-} & FocusErrorResult;
+} & KichiErrorResult;
 
 export type QueryNotesBoardResultPayload =
   | QueryNotesBoardSuccessPayload
@@ -203,7 +203,7 @@ export type CreateNotesBoardNoteSuccessPayload = NotesBoardMutationSuccessPayloa
 export type CreateNotesBoardNoteFailurePayload = {
   type: "create_notes_board_note_result";
   requestId: string;
-} & FocusErrorResult;
+} & KichiErrorResult;
 
 export type CreateNotesBoardNoteResultPayload =
   | CreateNotesBoardNoteSuccessPayload

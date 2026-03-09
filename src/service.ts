@@ -8,26 +8,26 @@ import type {
   ClockAction,
   ClockConfig,
   ClockPayload,
-  FocusConnectionStatus,
+  KichiConnectionStatus,
   CreateNotesBoardNotePayload,
   CreateNotesBoardNoteResultPayload,
-  FocusForwarderConfig,
-  FocusIdentity,
+  KichiForwarderConfig,
+  KichiIdentity,
   PoseType,
   QueryNotesBoardPayload,
   QueryNotesBoardResultPayload,
   StatusPayload,
 } from "./types.js";
 
-const IDENTITY_DIR = path.join(os.homedir(), ".openclaw", "focus-world");
+const IDENTITY_DIR = path.join(os.homedir(), ".openclaw", "kichi-world");
 const IDENTITY_PATH = path.join(IDENTITY_DIR, "identity.json");
 const MAX_NOTEBOARD_TEXT_LENGTH = 200;
 
-export class FocusForwarderService {
+export class KichiForwarderService {
   private ws: WebSocket | null = null;
   private stopped = false;
   private reconnectTimeout: NodeJS.Timeout | null = null;
-  private identity: FocusIdentity | null = null;
+  private identity: KichiIdentity | null = null;
   private joinResolve: ((authKey: string) => void) | null = null;
   private pendingRequests = new Map<
     string,
@@ -39,7 +39,7 @@ export class FocusForwarderService {
     }
   >();
 
-  constructor(private config: FocusForwarderConfig, private logger: Logger) {}
+  constructor(private config: KichiForwarderConfig, private logger: Logger) {}
 
   async start(): Promise<void> {
     if (!this.config.enabled) return;
@@ -51,7 +51,7 @@ export class FocusForwarderService {
   async stop(): Promise<void> {
     this.stopped = true;
     if (this.reconnectTimeout) clearTimeout(this.reconnectTimeout);
-    this.rejectPendingRequests("Focus websocket stopped");
+    this.rejectPendingRequests("Kichi websocket stopped");
     this.ws?.close();
     this.ws = null;
   }
@@ -86,7 +86,7 @@ export class FocusForwarderService {
     this.ws.on("message", (data) => this.handleMessage(data.toString()));
     this.ws.on("close", () => {
       this.ws = null;
-      this.rejectPendingRequests("Focus websocket closed");
+      this.rejectPendingRequests("Kichi websocket closed");
       if (!this.stopped) {
         this.reconnectTimeout = setTimeout(() => {
           this.reconnectTimeout = null;
@@ -112,7 +112,7 @@ export class FocusForwarderService {
         this.logger.warn(`Auth failed: ${msg.reason || "unknown"}`);
         this.clearAuthKey();
       } else if (msg.type === "leave_ack") {
-        this.logger.info("Left Focus world");
+        this.logger.info("Left Kichi world");
       }
     } catch (e) {
       this.logger.warn(`Failed to parse message: ${e}`);
@@ -167,7 +167,7 @@ export class FocusForwarderService {
     timeoutMs = 10000,
   ): Promise<TResponse> {
     if (this.ws?.readyState !== WebSocket.OPEN) {
-      return Promise.reject(new Error("Focus websocket is not connected"));
+      return Promise.reject(new Error("Kichi websocket is not connected"));
     }
 
     const requestId = payload.requestId?.trim() || randomUUID();
@@ -196,7 +196,7 @@ export class FocusForwarderService {
     });
   }
 
-  private loadIdentity(): FocusIdentity | null {
+  private loadIdentity(): KichiIdentity | null {
     try {
       if (!fs.existsSync(IDENTITY_PATH)) return null;
       const data = JSON.parse(fs.readFileSync(IDENTITY_PATH, "utf-8"));
@@ -287,7 +287,7 @@ export class FocusForwarderService {
   async queryNotesBoard(requestId?: string): Promise<QueryNotesBoardResultPayload> {
     const identity = this.requireIdentity();
     if (!identity) {
-      throw new Error("Missing Focus identity");
+      throw new Error("Missing Kichi identity");
     }
 
     const payload: QueryNotesBoardPayload = {
@@ -306,7 +306,7 @@ export class FocusForwarderService {
   ): Promise<CreateNotesBoardNoteResultPayload> {
     const identity = this.requireIdentity();
     if (!identity) {
-      throw new Error("Missing Focus identity");
+      throw new Error("Missing Kichi identity");
     }
 
     if (data.trim().length > MAX_NOTEBOARD_TEXT_LENGTH) {
@@ -336,7 +336,7 @@ export class FocusForwarderService {
       return {
         accepted: false,
         mode: "unavailable",
-        message: "Missing authKey. Run focus_join first.",
+        message: "Missing authKey. Run kichi_join first.",
       };
     }
 
@@ -378,7 +378,7 @@ export class FocusForwarderService {
     };
   }
 
-  getConnectionStatus(): FocusConnectionStatus {
+  getConnectionStatus(): KichiConnectionStatus {
     return {
       enabled: this.config.enabled,
       wsUrl: this.config.wsUrl,
@@ -392,7 +392,7 @@ export class FocusForwarderService {
     };
   }
 
-  private getWebsocketState(): FocusConnectionStatus["websocketState"] {
+  private getWebsocketState(): KichiConnectionStatus["websocketState"] {
     if (!this.ws) {
       return "idle";
     }

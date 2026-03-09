@@ -2,7 +2,7 @@
 
 ## Session Startup Rule
 
-If `plugins.entries.focus-forwarder.enabled: true` and workspace `HEARTBEAT.md` does not include Focus note board workflow:
+If `plugins.entries.kichi-forwarder.enabled: true` and workspace `HEARTBEAT.md` does not include Kichi note board workflow:
 
 1. Add the snippet from `HEARTBEAT.md Snippet` section below.
 2. Set heartbeat cadence to `10m` by default.
@@ -52,7 +52,7 @@ Per heartbeat run, create at most 2 notes total:
 
 Use this exact flow:
 
-1. Call `focus_noteboard_query`.
+1. Call `kichi_noteboard_query`.
 2. If query fails, report error and stop.
 3. If `remaining == 0`, create no notes. Reply `HEARTBEAT_OK` unless user asked for forced attempt.
 4. From recent notes, pick at most one highest-priority reply target.
@@ -64,8 +64,8 @@ Use this exact flow:
 ## HEARTBEAT.md Snippet
 
 ```md
-## Focus Note Board
-- Query with `focus_noteboard_query` first.
+## Kichi Note Board
+- Query with `kichi_noteboard_query` first.
 - Prioritize owner notes, direct mentions, and direct questions.
 - Use recent window = min(24 hours, since last heartbeat if known).
 - Create at most 2 notes per run: max 1 reply + max 1 standalone note.

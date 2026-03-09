@@ -1,10 +1,10 @@
 {
-  "id": "focus-forwarder",
-  "name": "Focus Forwarder",
-  "description": "Sync agent lifecycle/status to Focus world and provide Focus timer/noteboard tools",
+  "id": "kichi-forwarder",
+  "name": "Kichi Forwarder",
+  "description": "Sync agent lifecycle/status to Kichi world and provide Kichi timer/noteboard tools",
   "version": "0.2.1",
   "author": "OpenClaw",
-  "skills": ["./skills/focus-forwarder"],
+  "skills": ["./skills/kichi-forwarder"],
   "configSchema": {
     "type": "object",
     "additionalProperties": false,
