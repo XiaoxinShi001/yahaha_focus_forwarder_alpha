@@ -32,13 +32,6 @@ const RUNTIME_CONFIG_PATH = path.join(KICHI_WORLD_DIR, "kichi-runtime-config.jso
 const LEGACY_SKILLS_CONFIG_PATH = path.join(KICHI_WORLD_DIR, "skills-config.json");
 const IDENTITY_PATH = path.join(KICHI_WORLD_DIR, "identity.json");
 const MAX_NOTEBOARD_TEXT_LENGTH = 200;
-const MESSAGE_RECEIVED_BUBBLES = [
-  "(`ï½¥Ï‰ï½¥â€?ã‚?,
-  "(ï¿£^ï¿?ã‚?,
-  "(ã€ƒï½¥à¸´â€¿ï½¥à¸?ã‚?,
-  "(â‰§âˆ€â‰?ã‚?,
-];
-
 let cachedConfig: KichiRuntimeConfig | null = null;
 let cachedConfigMtime = 0;
 let cachedConfigPath = "";
@@ -188,21 +181,10 @@ function resolveStatusSourceId(ctx?: { agentId?: string; sessionKey?: string }):
 }
 
 async function handleMessageReceivedHook(
-  event: any,
-  ctx?: { agentId?: string; sessionKey?: string },
+  _event: any,
+  _ctx?: { agentId?: string; sessionKey?: string },
 ): Promise<void> {
-  if (!service?.hasValidIdentity() || !service?.isConnected()) {
-    return;
-  }
-
-  const sourceId = resolveStatusSourceId(ctx);
-  const content =
-    typeof event?.content === "string" && event.content.trim()
-      ? event.content.trim()
-      : JSON.stringify(event ?? "new message");
-  const bubble = pickRandomAction(MESSAGE_RECEIVED_BUBBLES);
-  const context = `${sourceId ? `[${sourceId}] ` : ""}Received: ${content}; bubble=${bubble}`;
-  service.sendStatus("", "", bubble, prefixLogTimestamp(truncateLog(context)));
+  return;
 }
 
 function registerPluginHooks(api: OpenClawPluginApi): void {
