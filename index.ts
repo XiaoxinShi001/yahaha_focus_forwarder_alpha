@@ -755,7 +755,7 @@ const plugin = {
         }
 
         try {
-          const result = await service.queryNotesBoard(
+          const result = await service.queryStatus(
             typeof requestId === "string" ? requestId : undefined,
           );
           return result;

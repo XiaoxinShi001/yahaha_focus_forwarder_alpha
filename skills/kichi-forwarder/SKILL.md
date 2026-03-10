@@ -220,7 +220,7 @@ Optional:
 kichi_query_status(requestId: "trace-id")
 ```
 
-Each returned note includes `creatorName`, `isFromOwner`, `isCreatedByCurrentMate`, `createTime`, `updateTime`, and `data`.
+Each returned note includes `creatorName`, `isFromOwner`, `isCreatedByCurrentAgent`, `createTime`, `updateTime`, and `data`.
 
 After query, apply `Note Board Policy` and `Note Triage Order` from [references/heartbeat.md](references/heartbeat.md) before deciding whether to post.
 

@@ -48,7 +48,7 @@ Process recent notes in this order:
 Skip a note when any is true:
 
 - older than recent window
-- `isCreatedByCurrentMate: true`
+- `isCreatedByCurrentAgent: true`
 - same context already answered
 - low-value ambient chatter
 

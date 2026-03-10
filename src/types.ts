@@ -125,30 +125,30 @@ export type ClockControlPayload = ClockPayloadBase & {
 
 export type ClockPayload = ClockSetPayload | ClockControlPayload;
 
-export type QueryNotesBoardNote = {
+export type QueryStatusBoardNote = {
   creatorName: string;
   isFromOwner: boolean;
-  isCreatedByCurrentMate: boolean;
+  isCreatedByCurrentAgent: boolean;
   createTime: string;
   updateTime: string;
   data: string;
 };
 
-export type QueryNotesBoard = {
+export type QueryStatusBoard = {
   propId: string;
   noteCount: number;
   latestActivityAt: string;
-  notes: QueryNotesBoardNote[];
+  notes: QueryStatusBoardNote[];
 };
 
-export type QueryNotesBoardPayload = {
+export type QueryStatusPayload = {
   type: "query_status";
   requestId: string;
   avatarId: string;
   authKey: string;
 };
 
-export type QueryNotesBoardSuccessPayload = {
+export type QueryStatusSuccessPayload = {
   type: "query_status_result";
   requestId: string;
   success: true;
@@ -157,17 +157,17 @@ export type QueryNotesBoardSuccessPayload = {
   dailyLimit: number;
   remaining: number;
   resetAtUtc: string;
-  boards: QueryNotesBoard[];
+  boards: QueryStatusBoard[];
 };
 
-export type QueryNotesBoardFailurePayload = {
+export type QueryStatusFailurePayload = {
   type: "query_status_result";
   requestId: string;
 } & KichiErrorResult;
 
-export type QueryNotesBoardResultPayload =
-  | QueryNotesBoardSuccessPayload
-  | QueryNotesBoardFailurePayload;
+export type QueryStatusResultPayload =
+  | QueryStatusSuccessPayload
+  | QueryStatusFailurePayload;
 
 export type CreateNotesBoardNotePayload = {
   type: "create_notes_board_note";

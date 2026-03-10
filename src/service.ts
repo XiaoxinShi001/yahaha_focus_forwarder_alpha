@@ -13,8 +13,8 @@ import type {
   KichiForwarderConfig,
   KichiIdentity,
   PoseType,
-  QueryNotesBoardPayload,
-  QueryNotesBoardResultPayload,
+  QueryStatusPayload,
+  QueryStatusResultPayload,
   StatusPayload,
 } from "./types.js";
 
@@ -283,19 +283,19 @@ export class KichiForwarderService {
     return true;
   }
 
-  async queryNotesBoard(requestId?: string): Promise<QueryNotesBoardResultPayload> {
+  async queryStatus(requestId?: string): Promise<QueryStatusResultPayload> {
     const identity = this.requireIdentity();
     if (!identity) {
       throw new Error("Missing Kichi identity");
     }
 
-    const payload: QueryNotesBoardPayload = {
+    const payload: QueryStatusPayload = {
       type: "query_status",
       requestId: requestId?.trim() || randomUUID(),
       avatarId: identity.avatarId,
       authKey: identity.authKey,
     };
-    return this.sendRequest<QueryNotesBoardResultPayload>(payload, "query_status_result");
+    return this.sendRequest<QueryStatusResultPayload>(payload, "query_status_result");
   }
 
   createNotesBoardNote(propId: string, data: string): void {
