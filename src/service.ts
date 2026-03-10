@@ -10,7 +10,6 @@ import type {
   ClockPayload,
   KichiConnectionStatus,
   CreateNotesBoardNotePayload,
-  CreateNotesBoardNoteResultPayload,
   KichiForwarderConfig,
   KichiIdentity,
   PoseType,
@@ -291,19 +290,15 @@ export class KichiForwarderService {
     }
 
     const payload: QueryNotesBoardPayload = {
-      type: "query_notes_board",
+      type: "query_status",
       requestId: requestId?.trim() || randomUUID(),
       mateId: identity.mateId,
       authKey: identity.authKey,
     };
-    return this.sendRequest<QueryNotesBoardResultPayload>(payload, "query_notes_board_result");
+    return this.sendRequest<QueryNotesBoardResultPayload>(payload, "query_status_result");
   }
 
-  async createNotesBoardNote(
-    propId: string,
-    data: string,
-    requestId?: string,
-  ): Promise<CreateNotesBoardNoteResultPayload> {
+  createNotesBoardNote(propId: string, data: string): void {
     const identity = this.requireIdentity();
     if (!identity) {
       throw new Error("Missing Kichi identity");
@@ -313,18 +308,18 @@ export class KichiForwarderService {
       throw new Error(`Note content must be ${MAX_NOTEBOARD_TEXT_LENGTH} characters or fewer`);
     }
 
+    if (this.ws?.readyState !== WebSocket.OPEN) {
+      throw new Error("Kichi websocket is not connected");
+    }
+
     const payload: CreateNotesBoardNotePayload = {
       type: "create_notes_board_note",
-      requestId: requestId?.trim() || randomUUID(),
       mateId: identity.mateId,
       authKey: identity.authKey,
       propId,
       data,
     };
-    return this.sendRequest<CreateNotesBoardNoteResultPayload>(
-      payload,
-      "create_notes_board_note_result",
-    );
+    this.ws.send(JSON.stringify(payload));
   }
 
   isConnected(): boolean { return this.ws?.readyState === WebSocket.OPEN && !!this.identity?.authKey; }

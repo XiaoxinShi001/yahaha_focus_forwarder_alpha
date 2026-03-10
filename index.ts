@@ -8,8 +8,6 @@ import type {
   ActionResult,
   ClockAction,
   ClockConfig,
-  CreateNotesBoardNote,
-  CreateNotesBoardNoteResultPayload,
   KichiRuntimeConfig,
   KichiForwarderConfig,
   PomodoroPhase,
@@ -25,6 +23,34 @@ const DEFAULT_ACTIONS: KichiRuntimeConfig["actions"] = {
 
 const DEFAULT_RUNTIME_CONFIG: KichiRuntimeConfig = {
   actions: DEFAULT_ACTIONS,
+  llmRuntimeEnabled: true,
+};
+const FIXED_HOOK_STATUSES: Record<string, ActionResult> = {
+  messageReceived: {
+    poseType: "sit",
+    action: "Study Look At",
+    bubble: "Reading request",
+  },
+  beforePromptBuild: {
+    poseType: "sit",
+    action: "Thinking",
+    bubble: "Planning task",
+  },
+  beforeToolCall: {
+    poseType: "sit",
+    action: "Typing with Keyboard",
+    bubble: "Working step",
+  },
+  agentEndSuccess: {
+    poseType: "stand",
+    action: "Yay",
+    bubble: "Task complete",
+  },
+  agentEndFailure: {
+    poseType: "stand",
+    action: "Tired",
+    bubble: "Task failed",
+  },
 };
 
 const KICHI_WORLD_DIR = path.join(os.homedir(), ".openclaw", "kichi-world");
@@ -57,6 +83,7 @@ function normalizeRuntimeConfig(value: unknown): KichiRuntimeConfig {
   const raw = value && typeof value === "object" ? (value as Partial<KichiRuntimeConfig>) : {};
   const actions = raw.actions;
   return {
+    llmRuntimeEnabled: typeof raw.llmRuntimeEnabled === "boolean" ? raw.llmRuntimeEnabled : true,
     actions: {
       stand: sanitizeActions(actions?.stand, DEFAULT_ACTIONS.stand),
       sit: sanitizeActions(actions?.sit, DEFAULT_ACTIONS.sit),
@@ -180,10 +207,33 @@ function resolveStatusSourceId(ctx?: { agentId?: string; sessionKey?: string }):
   return undefined;
 }
 
+function isLlmRuntimeEnabled(): boolean {
+  return loadRuntimeConfig().llmRuntimeEnabled;
+}
+
+function syncFixedStatus(status: ActionResult, log = ""): void {
+  if (!service?.hasValidIdentity() || !service?.isConnected()) {
+    return;
+  }
+  sendStatusAndRemember(status, log);
+}
+
+function buildToolExecutionLog(toolName: string, params: unknown, agentId?: string): string {
+  const paramsText = stringifyParamsForLog(params);
+  const prefix = typeof agentId === "string" && agentId.trim() ? `[${agentId.trim()}] ` : "";
+  return truncateLog(`${prefix}exec tool: ${toolName}, params: ${paramsText}`, 300);
+}
+
 async function handleMessageReceivedHook(
-  _event: any,
+  event: { content?: string },
   _ctx?: { agentId?: string; sessionKey?: string },
 ): Promise<void> {
+  if (!isLlmRuntimeEnabled()) {
+    const preview = typeof event?.content === "string" && event.content.trim()
+      ? truncateLog(`message received: ${event.content.trim()}`, 220)
+      : "message received";
+    syncFixedStatus(FIXED_HOOK_STATUSES.messageReceived, preview);
+  }
   return;
 }
 
@@ -192,17 +242,40 @@ function registerPluginHooks(api: OpenClawPluginApi): void {
     if (!service?.hasValidIdentity() || !service?.isConnected()) {
       return;
     }
+    if (!isLlmRuntimeEnabled()) {
+      syncFixedStatus(FIXED_HOOK_STATUSES.beforePromptBuild);
+      return;
+    }
     return {
       prependContext: buildKichiPrompt(),
     };
   });
 
   api.on("before_tool_call", (event, ctx) => {
+    if (!isLlmRuntimeEnabled()) {
+      syncFixedStatus(
+        FIXED_HOOK_STATUSES.beforeToolCall,
+        buildToolExecutionLog(event.toolName, event.params, ctx?.agentId),
+      );
+      return;
+    }
     forwardToolCallLog(event.toolName, event.params, ctx?.agentId);
   });
 
   api.on("message_received", async (event, ctx) => {
     await handleMessageReceivedHook(event, ctx);
+  });
+
+  api.on("agent_end", (event) => {
+    if (isLlmRuntimeEnabled()) {
+      return;
+    }
+    syncFixedStatus(
+      event.success ? FIXED_HOOK_STATUSES.agentEndSuccess : FIXED_HOOK_STATUSES.agentEndFailure,
+      event.success
+        ? "task finished"
+        : truncateLog(`task failed: ${event.error ?? "unknown error"}`, 220),
+    );
   });
 }
 
@@ -345,45 +418,6 @@ function pickRandomAction(actions: string[]): string {
   return actions[Math.floor(Math.random() * actions.length)];
 }
 
-function truncateNoteData(
-  data: string,
-  maxLen = 500,
-): { data: string; dataTruncated: boolean } {
-  if (data.length <= maxLen) {
-    return { data, dataTruncated: false };
-  }
-  return { data: `${data.slice(0, maxLen)}...`, dataTruncated: true };
-}
-
-function summarizeCreatedNote(note: CreateNotesBoardNote) {
-  const { data, dataTruncated } = truncateNoteData(note.data);
-  return {
-    id: note.id,
-    ownerName: note.ownerName,
-    createTime: note.createTime,
-    data,
-    dataTruncated,
-  };
-}
-
-function buildMutationSummary(result: CreateNotesBoardNoteResultPayload): string {
-  if (!result.success) {
-    const parts = ["Mutation failed"];
-    if ("errorCode" in result && result.errorCode) {
-      parts.push(`error=${result.errorCode}`);
-    }
-    if (typeof result.remaining === "number") {
-      parts.push(`remaining=${result.remaining}`);
-    }
-    if (result.resetAtUtc) {
-      parts.push(`resetAtUtc=${result.resetAtUtc}`);
-    }
-    return parts.join(", ");
-  }
-
-  const text = truncateNoteData(result.note.data, 120).data.replace(/\s+/g, " ").trim();
-  return `${result.propId} -> ${result.note.id} by ${result.note.ownerName}: ${text}`;
-}
 
 function buildKichiPrompt(): string {
   return [
@@ -391,23 +425,17 @@ function buildKichiPrompt(): string {
     "",
     "When to use `kichi_action`:",
     "- Task start: User gives you a new task to work on",
+    "- Step switch: Moving from one meaningful step or subtask to another within the current task",
     "- Task switch: Moving from one distinct task to another",
-    "- Major milestone: Completed a significant phase",
     "- Task end (highest priority): Before the final user-visible reply of this turn, MUST call `kichi_action` exactly once",
     "- Required order at task end: 1) call `kichi_action` 2) send final reply",
-    "- Trivial-operation skip applies only to Task start / Task switch / Major milestone, NOT Task end",
-    "",
-    "How to choose parameters:",
-    "- Choose poseType, action, and bubble that match your actual current activity",
-    "- Use available actions from the configured action list for each poseType",
-    "- bubble should be 2-5 words describing what you're doing now",
+    "- Trivial-operation skip applies only to Task start / Step switch / Task switch, NOT Task end",
     "",
     "When to use `kichi_clock`:",
-    "- Default behavior: For most tasks, set a `countDown` at task start to plan your time.",
-    "- Prefer using it whenever work has 2+ steps or is likely to take more than a brief moment (~10s).",
+    "- For tasks with 2+ meaningful steps or work likely to take more than a brief moment (~10s), set a `countDown` at task start.",
+    "- Skip clock only for truly quick one-shot operations.",
     "- If duration is uncertain, start with a reasonable estimate and adjust as work progresses.",
     "- If user requests a timer style, follow it (`pomodoro`, `countDown`, or `countUp`).",
-    "- Skip only for truly quick one-shot operations (for example a single file read or one simple command).",
     "",
     "Skip all sync if:",
     "- User says 'don't sync to Kichi' or similar",
@@ -705,7 +733,7 @@ const plugin = {
     });
 
     api.registerTool({
-      name: "kichi_noteboard_query",
+      name: "kichi_query_status",
       description:
         "Query Kichi note boards for the current mate. Use this before creating a new note, especially when you may want to relate it to an existing note.",
       parameters: {
@@ -755,18 +783,13 @@ const plugin = {
             type: "string",
             description: "Note content to create. Maximum 200 characters.",
           },
-          requestId: {
-            type: "string",
-            description: "Optional request ID for tracing or deduplication.",
-          },
         },
         required: ["propId", "data"],
       },
       execute: async (_toolCallId, params) => {
-        const { propId, data, requestId } = (params || {}) as {
+        const { propId, data } = (params || {}) as {
           propId?: unknown;
           data?: unknown;
-          requestId?: unknown;
         };
         if (typeof propId !== "string" || !propId.trim()) {
           return { success: false, error: "propId is required" };
@@ -780,38 +803,13 @@ const plugin = {
             error: `data must be ${MAX_NOTEBOARD_TEXT_LENGTH} characters or fewer`,
           };
         }
-        if (requestId !== undefined && typeof requestId !== "string") {
-          return { success: false, error: "requestId must be a string when provided" };
-        }
         if (!service?.hasValidIdentity() || !service?.isConnected()) {
           return { success: false, error: "Not connected to Kichi world" };
         }
 
         try {
-          const result = await service.createNotesBoardNote(
-            propId.trim(),
-            data.trim(),
-            typeof requestId === "string" ? requestId : undefined,
-          );
-          if (!result.success) {
-            return {
-              ...result,
-              summary: buildMutationSummary(result),
-            };
-          }
-
-          return {
-            success: true,
-            requestId: result.requestId,
-            mateId: result.mateId,
-            spaceId: result.spaceId,
-            propId: result.propId,
-            dailyLimit: result.dailyLimit,
-            remaining: result.remaining,
-            resetAtUtc: result.resetAtUtc,
-            note: summarizeCreatedNote(result.note),
-            summary: buildMutationSummary(result),
-          };
+          service.createNotesBoardNote(propId.trim(), data.trim());
+          return { success: true };
         } catch (error) {
           return {
             success: false,

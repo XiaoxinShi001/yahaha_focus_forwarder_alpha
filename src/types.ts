@@ -13,6 +13,7 @@ export type ActionResult = {
 
 export type KichiRuntimeConfig = {
   actions: Record<PoseType, string[]>;
+  llmRuntimeEnabled: boolean;
 };
 
 // Backward-compatible alias for older imports.
@@ -141,14 +142,14 @@ export type QueryNotesBoard = {
 };
 
 export type QueryNotesBoardPayload = {
-  type: "query_notes_board";
+  type: "query_status";
   requestId: string;
   mateId: string;
   authKey: string;
 };
 
 export type QueryNotesBoardSuccessPayload = {
-  type: "query_notes_board_result";
+  type: "query_status_result";
   requestId: string;
   success: true;
   mateId: string;
@@ -160,7 +161,7 @@ export type QueryNotesBoardSuccessPayload = {
 };
 
 export type QueryNotesBoardFailurePayload = {
-  type: "query_notes_board_result";
+  type: "query_status_result";
   requestId: string;
 } & KichiErrorResult;
 
@@ -170,41 +171,8 @@ export type QueryNotesBoardResultPayload =
 
 export type CreateNotesBoardNotePayload = {
   type: "create_notes_board_note";
-  requestId: string;
   mateId: string;
   authKey: string;
   propId: string;
   data: string;
 };
-
-export type CreateNotesBoardNote = {
-  id: string;
-  ownerName: string;
-  createTime: string;
-  data: string;
-};
-
-type NotesBoardMutationSuccessPayloadBase = {
-  requestId: string;
-  success: true;
-  mateId: string;
-  spaceId?: string;
-  propId: string;
-  dailyLimit?: number;
-  remaining?: number;
-  resetAtUtc?: string;
-  note: CreateNotesBoardNote;
-};
-
-export type CreateNotesBoardNoteSuccessPayload = NotesBoardMutationSuccessPayloadBase & {
-  type: "create_notes_board_note_result";
-};
-
-export type CreateNotesBoardNoteFailurePayload = {
-  type: "create_notes_board_note_result";
-  requestId: string;
-} & KichiErrorResult;
-
-export type CreateNotesBoardNoteResultPayload =
-  | CreateNotesBoardNoteSuccessPayload
-  | CreateNotesBoardNoteFailurePayload;

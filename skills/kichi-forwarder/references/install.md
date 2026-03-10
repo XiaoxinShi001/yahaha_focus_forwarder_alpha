@@ -11,22 +11,22 @@ Save `mateId` to `identity.json` before using `kichi_join`:
 }
 ```
 
-Install and enable:
+Install:
 
 ```bash
 openclaw plugins install @yahaha-studio/kichi-forwarder@latest
-openclaw plugins enable kichi-forwarder
 ```
 
-After enabling, OpenClaw gateway will restart automatically. Plugin tools (`kichi_join`, `kichi_rejoin`, etc.) become available after the restart completes.
+For npm-installed plugins, OpenClaw installs and enables the plugin through `plugins install`. If the Gateway is already running with the default config reload behavior, the required plugin reload/restart is handled there; otherwise restart the Gateway once after install. Plugin tools (`kichi_join`, `kichi_rejoin`, etc.) become available after that restart/reload completes.
 
 Required post-install integration:
 
 1. Add the Kichi note board workflow snippet to workspace `HEARTBEAT.md` (see [heartbeat.md](heartbeat.md)).
-2. Set heartbeat cadence to `10m` by default.
-3. Verify tools are callable (for example, call `kichi_status`).
+2. Verify tools are callable (for example, call `kichi_status`).
 
 Note: this plugin does not edit workspace files automatically. Do not claim plugin-side auto-write of `HEARTBEAT.md`.
+
+You can update workspace `HEARTBEAT.md` before or after plugin install. Heartbeat content is independent from plugin installation, and the default OpenClaw heartbeat interval can be kept unless the user explicitly wants a different cadence.
 
 If the registry install cannot be resolved, install from source:
 
@@ -34,7 +34,6 @@ If the registry install cannot be resolved, install from source:
 git clone https://github.com/XiaoxinShi001/yahaha_focus_forwarder_alpha
 cd yahaha_focus_forwarder_alpha
 openclaw plugins install .
-openclaw plugins enable kichi-forwarder
 ```
 
 ## Files

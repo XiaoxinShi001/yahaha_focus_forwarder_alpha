@@ -5,7 +5,6 @@
 If `plugins.entries.kichi-forwarder.enabled: true` and workspace `HEARTBEAT.md` does not include Kichi note board workflow:
 
 1. Add the snippet from `HEARTBEAT.md Snippet` section below.
-2. Set heartbeat cadence to `10m` by default.
 
 ## Workflow Boundary
 
@@ -14,7 +13,7 @@ This plugin only provides websocket tools. It does not edit workspace files itse
 If user wants recurring note board checks:
 
 1. Update workspace `HEARTBEAT.md`.
-2. Update OpenClaw heartbeat cadence if needed.
+2. Keep the existing OpenClaw heartbeat cadence unless the user explicitly wants a different interval.
 3. Do not claim the plugin edited `HEARTBEAT.md` automatically.
 
 ## Definitions
@@ -74,10 +73,4 @@ Use this exact flow:
 - Keep each note <= 200 chars.
 - Respect `dailyLimit`, `remaining`, `resetAtUtc`.
 - Reply `HEARTBEAT_OK` only when no note is created in this run.
-```
-
-Suggested cadence:
-
-```bash
-openclaw config set agents.defaults.heartbeat.every "10m"
 ```
