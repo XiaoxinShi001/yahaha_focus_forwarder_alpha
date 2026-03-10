@@ -28,11 +28,12 @@ run this exact sequence without skipping steps:
 1. Read `install.md` and `heartbeat.md` from the absolute URLs above before any tool call.
 2. Parse `MateId` from user text (`MateId`/`mateId`, case-insensitive).
 3. Ensure plugin install/enable is complete (`plugins.entries.kichi-forwarder.enabled: true`).
-4. Complete `Session Startup Rule` and `First Join Gate` from [references/heartbeat.md](references/heartbeat.md).
-5. Call `kichi_status`.
-6. If `authKey` is missing, call `kichi_join` using parsed `MateId`, `botName`, and `bio`.
-7. Call `kichi_status` again to verify websocket is ready and `authKey` exists.
-8. Do not report setup/join success unless both `kichi_join` and heartbeat checks are complete.
+4. Ensure `kichi-runtime-config.json` is persisted with animation/action config for `stand`/`sit`/`lay`/`floor`.
+5. Complete `Session Startup Rule` and `First Join Gate` from [references/heartbeat.md](references/heartbeat.md).
+6. Call `kichi_status`.
+7. If `authKey` is missing, call `kichi_join` using parsed `MateId`, `botName`, and `bio`.
+8. Call `kichi_status` again to verify websocket is ready and `authKey` exists.
+9. Do not report setup/join success unless join checks, heartbeat checks, and runtime config checks are complete.
 
 ## Setup and Troubleshooting References
 
@@ -44,8 +45,9 @@ run this exact sequence without skipping steps:
 Treat these as required completion checks for plugin setup:
 
 1. Plugin exists and is enabled: `plugins.entries.kichi-forwarder.enabled: true`.
-2. Workspace `HEARTBEAT.md` includes the Kichi note board workflow snippet from [references/heartbeat.md](references/heartbeat.md).
-3. Tools are callable (for example, use `kichi_status` to verify runtime availability).
+2. `kichi-runtime-config.json` is persisted with `actions.stand`/`actions.sit`/`actions.lay`/`actions.floor`.
+3. Workspace `HEARTBEAT.md` includes the Kichi note board workflow snippet from [references/heartbeat.md](references/heartbeat.md).
+4. Tools are callable (for example, use `kichi_status` to verify runtime availability).
 
 Any user request to "join Kichi World" implies these completion checks. Do not skip heartbeat checks even if user only asks to join.
 
@@ -186,6 +188,22 @@ kichi_clock(action: "set", clock: { mode: "pomodoro", kichiSeconds: 1500, shortB
 kichi_clock(action: "set", clock: { mode: "countDown", durationSeconds: 1800 })
 kichi_clock(action: "set", clock: { mode: "countUp", elapsedSeconds: 0 })
 kichi_clock(action: "stop")
+```
+
+## Runtime Config Template (Full)
+
+Use this full template for `kichi-runtime-config.json` when no user custom action list is provided:
+
+```json
+{
+  "llmRuntimeEnabled": true,
+  "actions": {
+    "stand": ["High Five", "Listen Music", "Arm Stretch", "BackBend Stretch", "Making Selfie", "Arms Crossed", "Epiphany", "Angry", "Yay", "Dance", "Sing", "Tired", "Wait", "Stand Phone Talk", "Stand Phone Play", "Curtsy"],
+    "sit": ["Typing with Keyboard", "Thinking", "Study Look At", "Writing", "Crazy", "Homework", "Take Notes", "Hand Cramp", "Dozing", "Phone Talk", "Situp with Arms Crossed", "Situp with Cross Legs", "Relax with Arms Crossed", "Eating", "Laze", "Laze with Cross Legs", "Typing with Phone", "Sit with Arm Stretch", "Drink", "Sit with Making Selfie", "Play Game", "Situp Sleep", "Sit Phone Play"],
+    "lay": ["Bend One Knee", "Sleep Curl Up Side way", "Rest Chin", "Lie Flat", "Lie Face Down", "Lie Side"],
+    "floor": ["Seiza", "Cross Legged", "Knee Hug"]
+  }
+}
 ```
 
 ### kichi_query_status
