@@ -20,7 +20,7 @@ export type KichiRuntimeConfig = {
 export type SkillsConfig = KichiRuntimeConfig;
 
 export type KichiIdentity = {
-  mateId: string;
+  avatarId: string;
   authKey?: string;
 };
 
@@ -30,7 +30,7 @@ export type KichiConnectionStatus = {
   connected: boolean;
   websocketState: "idle" | "connecting" | "open" | "closing" | "closed";
   hasIdentity: boolean;
-  mateId?: string;
+  avatarId?: string;
   hasAuthKey: boolean;
   pendingRequestCount: number;
   reconnectScheduled: boolean;
@@ -48,7 +48,7 @@ export type KichiErrorResult = {
 
 export type JoinPayload = {
   type: "join";
-  mateId: string;
+  avatarId: string;
   botName: string;
   bio: string;
 };
@@ -60,13 +60,13 @@ export type JoinAckPayload = {
 
 export type LeavePayload = {
   type: "leave";
-  mateId: string;
+  avatarId: string;
   authKey: string;
 };
 
 export type StatusPayload = {
   type: "status";
-  mateId: string;
+  avatarId: string;
   authKey: string;
   poseType: PoseType | "";
   action: string;
@@ -109,7 +109,7 @@ export type ClockConfig = PomodoroClock | CountDownClock | CountUpClock;
 
 type ClockPayloadBase = {
   type: "clock";
-  mateId: string;
+  avatarId: string;
   authKey: string;
   requestId?: string;
 };
@@ -144,7 +144,7 @@ export type QueryNotesBoard = {
 export type QueryNotesBoardPayload = {
   type: "query_status";
   requestId: string;
-  mateId: string;
+  avatarId: string;
   authKey: string;
 };
 
@@ -152,7 +152,7 @@ export type QueryNotesBoardSuccessPayload = {
   type: "query_status_result";
   requestId: string;
   success: true;
-  mateId: string;
+  avatarId: string;
   spaceId: string;
   dailyLimit: number;
   remaining: number;
@@ -171,7 +171,7 @@ export type QueryNotesBoardResultPayload =
 
 export type CreateNotesBoardNotePayload = {
   type: "create_notes_board_note";
-  mateId: string;
+  avatarId: string;
   authKey: string;
   propId: string;
   data: string;

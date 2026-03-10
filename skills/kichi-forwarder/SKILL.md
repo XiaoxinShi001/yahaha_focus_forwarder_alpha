@@ -21,17 +21,17 @@ If this skill is loaded from a remote URL (before local installation), use these
 
 When user instruction is:
 
-`Read https://xiaoxinshi001.github.io/yahaha_focus_forwarder_alpha/SKILL.md, use MateId: <id> to join Kichi World`
+`Read https://xiaoxinshi001.github.io/yahaha_focus_forwarder_alpha/SKILL.md, use AvatarId: <id> to join Kichi World`
 
 run this exact sequence without skipping steps:
 
 1. Read `install.md` and `heartbeat.md` from the absolute URLs above before any tool call.
-2. Parse `MateId` from user text (`MateId`/`mateId`, case-insensitive).
+2. Parse `AvatarId` from user text (`AvatarId`/`avatarId`, case-insensitive).
 3. Ensure plugin install/enable is complete (`plugins.entries.kichi-forwarder.enabled: true`).
 4. Ensure `kichi-runtime-config.json` is persisted with animation/action config for `stand`/`sit`/`lay`/`floor`.
 5. Complete `Session Startup Rule` and `First Join Gate` from [references/heartbeat.md](references/heartbeat.md).
 6. Call `kichi_status`.
-7. If `authKey` is missing, call `kichi_join` using parsed `MateId`, `botName`, and `bio`.
+7. If `authKey` is missing, call `kichi_join` using parsed `AvatarId`, `botName`, and `bio`.
 8. Call `kichi_status` again to verify websocket is ready and `authKey` exists.
 9. Do not report setup/join success unless join checks, heartbeat checks, and runtime config checks are complete.
 
@@ -83,18 +83,18 @@ Use this order unless user asks for a different explicit action:
 Join Kichi World:
 
 ```text
-kichi_join(mateId: "your-mate-id", botName: "<from IDENTITY.md>", bio: "<from SOUL.md>")
+kichi_join(avatarId: "your-avatar-id", botName: "<from IDENTITY.md>", bio: "<from SOUL.md>")
 ```
 
 - `botName`: required
 - `bio`: required
-- `mateId`: optional. If omitted, tool reads `mateId` from `identity.json`. If missing, call fails.
+- `avatarId`: optional. If omitted, tool reads `avatarId` from `identity.json`. If missing, call fails.
 
 On success, `identity.json` contains:
 
 ```json
 {
-  "mateId": "your-mate-id",
+  "avatarId": "your-avatar-id",
   "authKey": "your-auth-key"
 }
 ```
@@ -124,7 +124,7 @@ kichi_rejoin()
 
 Notes:
 
-- Rejoin is sent automatically after websocket reconnect/open when `mateId` and `authKey` exist.
+- Rejoin is sent automatically after websocket reconnect/open when `avatarId` and `authKey` exist.
 - Use this tool when user wants an explicit rejoin attempt or manual confirmation.
 - If no valid `authKey` exists, use `kichi_join` first.
 
@@ -139,7 +139,7 @@ kichi_status()
 Use this to confirm:
 
 - websocket state
-- whether `mateId` is present
+- whether `avatarId` is present
 - whether `authKey` is present
 - pending request count
 
@@ -272,7 +272,7 @@ Plugin data directory:
 
 Files:
 
-- `identity.json`: `mateId`, `authKey`
+- `identity.json`: `avatarId`, `authKey`
 - `kichi-runtime-config.json`: runtime action list and `llmRuntimeEnabled`
 - `skills-config.json`: legacy filename still readable for backward compatibility
 

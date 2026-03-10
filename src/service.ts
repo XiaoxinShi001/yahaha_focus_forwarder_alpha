@@ -56,15 +56,15 @@ export class KichiForwarderService {
   }
 
   async join(
-    mateId: string,
+    avatarId: string,
     botName: string,
     bio: string,
   ): Promise<string | null> {
     return new Promise((resolve) => {
-      this.identity = { mateId };
+      this.identity = { avatarId };
       this.joinResolve = resolve;
       const sendJoin = () =>
-        this.ws?.send(JSON.stringify({ type: "join", mateId, botName, bio }));
+        this.ws?.send(JSON.stringify({ type: "join", avatarId, botName, bio }));
       if (this.ws?.readyState === WebSocket.OPEN) {
         sendJoin();
       } else {
@@ -103,7 +103,7 @@ export class KichiForwarderService {
       if (msg.type === "join_ack" && msg.authKey && this.identity) {
         this.identity.authKey = msg.authKey;
         this.saveIdentity();
-        this.logger.info(`Joined as ${this.identity.mateId}`);
+        this.logger.info(`Joined as ${this.identity.avatarId}`);
         this.joinResolve?.(msg.authKey);
         this.joinResolve = null;
       } else if (msg.type === "rejoin_failed" || msg.type === "auth_error") {
@@ -150,12 +150,12 @@ export class KichiForwarderService {
     this.pendingRequests.clear();
   }
 
-  private requireIdentity(): { mateId: string; authKey: string } | null {
-    if (!this.identity?.mateId || !this.identity?.authKey) {
+  private requireIdentity(): { avatarId: string; authKey: string } | null {
+    if (!this.identity?.avatarId || !this.identity?.authKey) {
       return null;
     }
     return {
-      mateId: this.identity.mateId,
+      avatarId: this.identity.avatarId,
       authKey: this.identity.authKey,
     };
   }
@@ -199,10 +199,10 @@ export class KichiForwarderService {
     try {
       if (!fs.existsSync(IDENTITY_PATH)) return null;
       const data = JSON.parse(fs.readFileSync(IDENTITY_PATH, "utf-8"));
-      const mateId = typeof data.mateId === "string" && data.mateId ? data.mateId : null;
-      if (mateId) {
+      const avatarId = typeof data.avatarId === "string" && data.avatarId ? data.avatarId : null;
+      if (avatarId) {
         return {
-          mateId,
+          avatarId,
           authKey: typeof data.authKey === "string" ? data.authKey : undefined,
         };
       }
@@ -214,7 +214,7 @@ export class KichiForwarderService {
   }
 
   private saveIdentity(): void {
-    if (!this.identity?.mateId) return;
+    if (!this.identity?.avatarId) return;
     try {
       if (!fs.existsSync(IDENTITY_DIR)) fs.mkdirSync(IDENTITY_DIR, { recursive: true, mode: 0o700 });
       fs.writeFileSync(IDENTITY_PATH, JSON.stringify(this.identity, null, 2), { mode: 0o600 });
@@ -231,14 +231,14 @@ export class KichiForwarderService {
   }
 
   private sendRejoinPayload(): boolean {
-    if (!this.identity?.mateId || !this.identity?.authKey || this.ws?.readyState !== WebSocket.OPEN) {
+    if (!this.identity?.avatarId || !this.identity?.authKey || this.ws?.readyState !== WebSocket.OPEN) {
       return false;
     }
 
     this.ws.send(
-      JSON.stringify({ type: "rejoin", mateId: this.identity.mateId, authKey: this.identity.authKey }),
+      JSON.stringify({ type: "rejoin", avatarId: this.identity.avatarId, authKey: this.identity.authKey }),
     );
-    this.logger.debug(`Sent rejoin for ${this.identity.mateId}`);
+    this.logger.debug(`Sent rejoin for ${this.identity.avatarId}`);
     return true;
   }
 
@@ -246,7 +246,7 @@ export class KichiForwarderService {
     if (!this.identity?.authKey || this.ws?.readyState !== WebSocket.OPEN) return;
     const payload: StatusPayload = {
       type: "status",
-      mateId: this.identity.mateId,
+      avatarId: this.identity.avatarId,
       authKey: this.identity.authKey,
       poseType,
       action,
@@ -262,7 +262,7 @@ export class KichiForwarderService {
 
     const basePayload = {
       type: "clock" as const,
-      mateId: this.identity.mateId,
+      avatarId: this.identity.avatarId,
       authKey: this.identity.authKey,
       ...(requestId ? { requestId } : {}),
     };
@@ -292,7 +292,7 @@ export class KichiForwarderService {
     const payload: QueryNotesBoardPayload = {
       type: "query_status",
       requestId: requestId?.trim() || randomUUID(),
-      mateId: identity.mateId,
+      avatarId: identity.avatarId,
       authKey: identity.authKey,
     };
     return this.sendRequest<QueryNotesBoardResultPayload>(payload, "query_status_result");
@@ -314,7 +314,7 @@ export class KichiForwarderService {
 
     const payload: CreateNotesBoardNotePayload = {
       type: "create_notes_board_note",
-      mateId: identity.mateId,
+      avatarId: identity.avatarId,
       authKey: identity.authKey,
       propId,
       data,
@@ -324,10 +324,10 @@ export class KichiForwarderService {
 
   isConnected(): boolean { return this.ws?.readyState === WebSocket.OPEN && !!this.identity?.authKey; }
 
-  hasValidIdentity(): boolean { return !!this.identity?.mateId && !!this.identity?.authKey; }
+  hasValidIdentity(): boolean { return !!this.identity?.avatarId && !!this.identity?.authKey; }
 
   requestRejoin(): { accepted: boolean; mode: "sent" | "waiting_open" | "reconnecting" | "unavailable"; message: string } {
-    if (!this.identity?.mateId || !this.identity?.authKey) {
+    if (!this.identity?.avatarId || !this.identity?.authKey) {
       return {
         accepted: false,
         mode: "unavailable",
@@ -379,8 +379,8 @@ export class KichiForwarderService {
       wsUrl: this.config.wsUrl,
       connected: this.isConnected(),
       websocketState: this.getWebsocketState(),
-      hasIdentity: !!this.identity?.mateId,
-      mateId: this.identity?.mateId,
+      hasIdentity: !!this.identity?.avatarId,
+      avatarId: this.identity?.avatarId,
       hasAuthKey: !!this.identity?.authKey,
       pendingRequestCount: this.pendingRequests.size,
       reconnectScheduled: !!this.reconnectTimeout,
@@ -405,7 +405,7 @@ export class KichiForwarderService {
   }
 
   async leave(): Promise<boolean> {
-    if (!this.identity?.mateId || !this.identity?.authKey || this.ws?.readyState !== WebSocket.OPEN) return false;
+    if (!this.identity?.avatarId || !this.identity?.authKey || this.ws?.readyState !== WebSocket.OPEN) return false;
     return new Promise((resolve) => {
       const handler = (data: WebSocket.Data) => {
         try {
@@ -421,7 +421,7 @@ export class KichiForwarderService {
       };
       this.ws!.on("message", handler);
       this.ws!.send(
-        JSON.stringify({ type: "leave", mateId: this.identity!.mateId, authKey: this.identity!.authKey }),
+        JSON.stringify({ type: "leave", avatarId: this.identity!.avatarId, authKey: this.identity!.authKey }),
       );
       setTimeout(() => { this.ws?.off("message", handler); resolve(false); }, 10000);
     });

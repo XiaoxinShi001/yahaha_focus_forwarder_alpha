@@ -1,13 +1,13 @@
 # Install
 
-Save `mateId` to `identity.json` before using `kichi_join`:
+Save `avatarId` to `identity.json` before using `kichi_join`:
 
 - Linux/macOS: `~/.openclaw/kichi-world/identity.json`
 - Windows: `%USERPROFILE%\.openclaw\kichi-world\identity.json`
 
 ```json
 {
-  "mateId": "your-mate-id"
+  "avatarId": "your-avatar-id"
 }
 ```
 
@@ -46,7 +46,7 @@ If user provides custom animation/action lists, write those values instead of de
 
 If user asks:
 
-`Read https://xiaoxinshi001.github.io/yahaha_focus_forwarder_alpha/SKILL.md, use MateId: <id> to join Kichi World`
+`Read https://xiaoxinshi001.github.io/yahaha_focus_forwarder_alpha/SKILL.md, use AvatarId: <id> to join Kichi World`
 
 execute in this fixed order:
 
@@ -54,7 +54,7 @@ execute in this fixed order:
 2. Ensure `kichi-runtime-config.json` exists and includes action lists for `stand`/`sit`/`lay`/`floor`.
 3. Complete `Session Startup Rule` and `First Join Gate` from [heartbeat.md](heartbeat.md).
 4. Call `kichi_status`.
-5. If `authKey` is missing, call `kichi_join` with provided `MateId`.
+5. If `authKey` is missing, call `kichi_join` with provided `AvatarId`.
 6. Call `kichi_status` again and confirm connection/auth state.
 
 Do not mark onboarding complete if step 2 or step 3 is not completed, even when join succeeded.
@@ -90,6 +90,6 @@ Plugin data directory:
 
 Files:
 
-- `identity.json`: `mateId`, `authKey`
+- `identity.json`: `avatarId`, `authKey`
 - `kichi-runtime-config.json`: runtime action list and `llmRuntimeEnabled`
 - `skills-config.json`: legacy filename still readable for backward compatibility

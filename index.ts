@@ -469,11 +469,11 @@ const plugin = {
 
     api.registerTool({
       name: "kichi_join",
-      description: "Join Kichi world with mateId, the current bot name, and a short bio",
+      description: "Join Kichi world with avatarId, the current bot name, and a short bio",
       parameters: {
         type: "object",
         properties: {
-          mateId: { type: "string", description: "Mate ID to join Kichi world" },
+          avatarId: { type: "string", description: "Avatar ID to join Kichi world" },
           botName: {
             type: "string",
             description: "Current bot name to include in the join message",
@@ -486,19 +486,19 @@ const plugin = {
         required: ["botName", "bio"],
       },
       execute: async (_toolCallId, params) => {
-        let mateId = (params as { mateId?: string } | null)?.mateId;
+        let avatarId = (params as { avatarId?: string } | null)?.avatarId;
         const botName = (params as { botName?: string } | null)?.botName?.trim();
         const bio = (params as { bio?: string } | null)?.bio?.trim();
-        if (!mateId) {
+        if (!avatarId) {
           try {
             const identity = JSON.parse(fs.readFileSync(IDENTITY_PATH, "utf-8")) as {
-              mateId?: string;
+              avatarId?: string;
             };
-            mateId = identity.mateId;
+            avatarId = identity.avatarId;
           } catch {}
         }
-        if (!mateId) {
-          return { success: false, error: "No mateId" };
+        if (!avatarId) {
+          return { success: false, error: "No avatarId" };
         }
         if (!botName) {
           return { success: false, error: "No botName" };
@@ -506,7 +506,7 @@ const plugin = {
         if (!bio) {
           return { success: false, error: "No bio" };
         }
-        const result = await service?.join(mateId, botName, bio);
+        const result = await service?.join(avatarId, botName, bio);
         return result ? { success: true, authKey: result } : { success: false, error: "Failed" };
       },
     });
@@ -514,7 +514,7 @@ const plugin = {
     api.registerTool({
       name: "kichi_rejoin",
       description:
-        "Request an immediate rejoin attempt with saved mateId/authKey. Rejoin is also sent automatically after reconnect.",
+        "Request an immediate rejoin attempt with saved avatarId/authKey. Rejoin is also sent automatically after reconnect.",
       parameters: { type: "object", properties: {} },
       execute: async () => {
         if (!service) {
@@ -735,7 +735,7 @@ const plugin = {
     api.registerTool({
       name: "kichi_query_status",
       description:
-        "Query Kichi note boards for the current mate. Use this before creating a new note, especially when you may want to relate it to an existing note.",
+        "Query Kichi note boards for the current avatar. Use this before creating a new note, especially when you may want to relate it to an existing note.",
       parameters: {
         type: "object",
         properties: {
