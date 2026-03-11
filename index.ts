@@ -735,7 +735,7 @@ const plugin = {
     api.registerTool({
       name: "kichi_query_status",
       description:
-        "Query Kichi note boards for the current avatar. Use this before creating a new note, especially when you may want to relate it to an existing note.",
+        "Query Kichi avatar status (notes, weather/time, timer snapshot, and daily note quota). Use this before creating a new note.",
       parameters: {
         type: "object",
         properties: {
@@ -762,7 +762,7 @@ const plugin = {
         } catch (error) {
           return {
             success: false,
-            error: `Failed to query note boards: ${error}`,
+            error: `Failed to query status: ${error}`,
           };
         }
       },

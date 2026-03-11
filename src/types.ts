@@ -125,22 +125,6 @@ export type ClockControlPayload = ClockPayloadBase & {
 
 export type ClockPayload = ClockSetPayload | ClockControlPayload;
 
-export type QueryStatusBoardNote = {
-  creatorName: string;
-  isFromOwner: boolean;
-  isCreatedByCurrentAgent: boolean;
-  createTime: string;
-  updateTime: string;
-  data: string;
-};
-
-export type QueryStatusBoard = {
-  propId: string;
-  noteCount: number;
-  latestActivityAt: string;
-  notes: QueryStatusBoardNote[];
-};
-
 export type QueryStatusPayload = {
   type: "query_status";
   requestId: string;
@@ -148,26 +132,26 @@ export type QueryStatusPayload = {
   authKey: string;
 };
 
-export type QueryStatusSuccessPayload = {
+export type QueryStatusResultPayload = {
   type: "query_status_result";
   requestId: string;
-  success: true;
-  avatarId: string;
-  spaceId: string;
   dailyLimit: number;
   remaining: number;
-  resetAtUtc: string;
-  boards: QueryStatusBoard[];
+  errorCode: string;
+  errorMessage: string;
+  notes: QueryStatusNote[];
+  /** All other server fields (timer, environmentWeather, etc.) are passed through to the LLM as-is. */
+  [key: string]: unknown;
 };
 
-export type QueryStatusFailurePayload = {
-  type: "query_status_result";
-  requestId: string;
-} & KichiErrorResult;
-
-export type QueryStatusResultPayload =
-  | QueryStatusSuccessPayload
-  | QueryStatusFailurePayload;
+export type QueryStatusNote = {
+  propId: string;
+  authorName: string;
+  isCreatedByCurrentAgent: boolean;
+  isFromOwner: boolean;
+  createdAtUtc: string;
+  content: string;
+};
 
 export type CreateNotesBoardNotePayload = {
   type: "create_notes_board_note";
