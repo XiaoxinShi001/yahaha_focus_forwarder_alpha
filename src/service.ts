@@ -8,6 +8,7 @@ import type {
   ClockAction,
   ClockConfig,
   ClockPayload,
+  CreateMusicAlbumPayload,
   KichiConnectionStatus,
   CreateNotesBoardNotePayload,
   KichiForwarderConfig,
@@ -320,6 +321,34 @@ export class KichiForwarderService {
       data,
     };
     this.ws.send(JSON.stringify(payload));
+  }
+
+  createMusicAlbum(albumTitle: string, musicTitles: string[], requestId?: string): string {
+    const identity = this.requireIdentity();
+    if (!identity) {
+      throw new Error("Missing Kichi identity");
+    }
+    if (!albumTitle.trim()) {
+      throw new Error("albumTitle is required");
+    }
+    if (!Array.isArray(musicTitles) || musicTitles.length === 0) {
+      throw new Error("musicTitles must contain at least one track title");
+    }
+    if (this.ws?.readyState !== WebSocket.OPEN) {
+      throw new Error("Kichi websocket is not connected");
+    }
+
+    const normalizedRequestId = requestId?.trim() || randomUUID();
+    const payload: CreateMusicAlbumPayload = {
+      type: "create_music_album",
+      requestId: normalizedRequestId,
+      avatarId: identity.avatarId,
+      authKey: identity.authKey,
+      albumTitle: albumTitle.trim(),
+      musicTitles,
+    };
+    this.ws.send(JSON.stringify(payload));
+    return normalizedRequestId;
   }
 
   isConnected(): boolean { return this.ws?.readyState === WebSocket.OPEN && !!this.identity?.authKey; }

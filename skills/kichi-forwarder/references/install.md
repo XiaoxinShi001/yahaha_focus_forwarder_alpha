@@ -65,6 +65,29 @@ Required post-install integration:
 2. Add the Kichi note board workflow snippet to workspace `HEARTBEAT.md` (see [heartbeat.md](heartbeat.md)).
 3. Verify tools are callable (for example, call `kichi_status`).
 
+## Daily Music Album Cron (Default)
+
+During install/onboarding, create a daily recurring "create music album" cron job by default.
+
+Use OpenClaw cron (isolated session + direct message):
+
+```bash
+openclaw cron add \
+  --name "Kichi Daily Music Album" \
+  --cron "0 9 * * *" \
+  --session isolated \
+  --message "Call kichi_query_status first, then call kichi_music_album_create once, following Music Album Policy." \
+  --no-deliver
+```
+
+Notes:
+
+- `0 9 * * *` means once per day at 09:00.
+- If `--tz` is omitted, schedule uses OpenClaw machine local timezone.
+- Isolated cron defaults to announce delivery; `--no-deliver` keeps this as an internal background run.
+- For install completion, verify the job exists with `openclaw cron list`.
+- If user does not want this recurring task, they can delete the cron job after install.
+
 Note: this plugin does not edit workspace files automatically. Do not claim plugin-side auto-write of `HEARTBEAT.md`.
 
 If writing `HEARTBEAT.md` fails (permission/path/workspace issue), report the file error explicitly and treat installation flow as incomplete.

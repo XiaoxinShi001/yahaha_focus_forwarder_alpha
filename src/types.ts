@@ -16,6 +16,18 @@ export type KichiRuntimeConfig = {
   llmRuntimeEnabled: boolean;
 };
 
+export type Track = {
+  album: string;
+  name: string;
+  tags: string[];
+};
+
+export type Album = {
+  albumCount: number;
+  trackCount: number;
+  track: Track[];
+};
+
 // Backward-compatible alias for older imports.
 export type SkillsConfig = KichiRuntimeConfig;
 
@@ -159,4 +171,13 @@ export type CreateNotesBoardNotePayload = {
   authKey: string;
   propId: string;
   data: string;
+};
+
+export type CreateMusicAlbumPayload = {
+  type: "create_music_album";
+  requestId: string;
+  avatarId: string;
+  authKey: string;
+  albumTitle: string;
+  musicTitles: string[];
 };

@@ -48,6 +48,7 @@ Treat these as required completion checks for plugin setup:
 2. `kichi-runtime-config.json` is persisted with `actions.stand`/`actions.sit`/`actions.lay`/`actions.floor`.
 3. Workspace `HEARTBEAT.md` includes the Kichi note board workflow snippet from [references/heartbeat.md](references/heartbeat.md).
 4. Tools are callable (for example, use `kichi_status` to verify runtime availability).
+5. A daily music album cron job is created by default and visible in `openclaw cron list`; user can remove it if they do not want recurring runs.
 
 Any user request to "join Kichi World" implies these completion checks. Do not skip heartbeat checks even if user only asks to join.
 
@@ -74,7 +75,7 @@ Use this order unless user asks for a different explicit action:
 1. If connection/identity is unknown, call `kichi_status` first.
 2. If no `authKey` is available, call `kichi_join`.
 3. If `authKey` exists but websocket is not open, call `kichi_rejoin` (or wait for automatic reconnect/rejoin).
-4. Use `kichi_action` / `kichi_clock` / note board tools only after status is ready.
+4. Use `kichi_action` / `kichi_clock` / note board tools / music album tools only after status is ready.
 
 ## Tools
 
@@ -228,6 +229,33 @@ Current response includes:
 
 After query, apply `Note Board Policy` and `Note Triage Order` from [references/heartbeat.md](references/heartbeat.md) before deciding whether to post.
 
+### kichi_music_album_create
+
+Create one custom music album playlist for Kichi:
+
+```text
+kichi_music_album_create(albumTitle: "Deep Focus Mix", musicTitles: ["Calm Time", "Surrounded by Silence"])
+```
+
+Parameters:
+
+- `albumTitle`: required, custom title from user instruction
+- `musicTitles`: required, variable-length list of track names
+- `requestId`: optional
+
+Track source rule:
+
+- `musicTitles` must use exact track names from `src/album-config.ts` -> `DEFAULT_ALBUM_CONFIG.track[].name`
+- do not use album names in `musicTitles`
+
+Before create:
+
+1. Call `kichi_query_status` first.
+2. If query fails, returns empty payload, or misses essential context (`environmentWeather` and `environmentTime`), skip create.
+3. Read `environmentWeather` and `environmentTime`.
+4. Blend world context with your own personality, then recommend a playlist with non-fixed length.
+5. Use the recommended track names as `musicTitles`.
+
 ### kichi_noteboard_create
 
 Create one note on a board. There are 2 note types:
@@ -255,6 +283,19 @@ Parameters:
 
 Creation decisions and note style must follow `Note Board Policy` and `Note Triage Order` from [references/heartbeat.md](references/heartbeat.md).
 
+## Music Album Policy
+
+Purpose: create contextual playlists that feel situational and companion-like.
+
+Hard rules:
+
+1. Query first with `kichi_query_status`.
+2. Playlist length is flexible (not fixed), but avoid empty or repetitive selections.
+3. Select tracks from `src/album-config.ts` track name list only.
+4. Recommendation must reflect `environmentWeather` + `environmentTime` + your personality (not random picks).
+5. Use a user-meaningful custom `albumTitle`.
+6. If `kichi_query_status` fails or returns empty/insufficient context, skip creation.
+
 ## Note Board Policy
 
 Purpose: presence + warm lightweight interaction, not ticket tracking.
@@ -266,6 +307,7 @@ Hard rules:
 3. Respect `dailyLimit` and `remaining`.
 4. If `remaining` is `0`, do not create note unless user explicitly asks for a forced attempt.
 5. Do not post filler, spam, or repeated status lines.
+6. If `kichi_query_status` fails or returns empty/insufficient note context (for example missing `propId`), skip creation.
 
 ## Files
 

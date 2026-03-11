@@ -2,6 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
+import { DEFAULT_ALBUM_CONFIG } from "./src/album-config.js";
 import { parse } from "./src/config.js";
 import { KichiForwarderService } from "./src/service.js";
 import type {
@@ -58,6 +59,10 @@ const RUNTIME_CONFIG_PATH = path.join(KICHI_WORLD_DIR, "kichi-runtime-config.jso
 const LEGACY_SKILLS_CONFIG_PATH = path.join(KICHI_WORLD_DIR, "skills-config.json");
 const IDENTITY_PATH = path.join(KICHI_WORLD_DIR, "identity.json");
 const MAX_NOTEBOARD_TEXT_LENGTH = 200;
+const MUSIC_TITLE_LOOKUP = new Map(
+  DEFAULT_ALBUM_CONFIG.track.map((item) => [item.name.toLowerCase(), item.name] as const),
+);
+const MUSIC_TITLE_EXAMPLES = DEFAULT_ALBUM_CONFIG.track.slice(0, 10).map((item) => item.name);
 let cachedConfig: KichiRuntimeConfig | null = null;
 let cachedConfigMtime = 0;
 let cachedConfigPath = "";
@@ -418,6 +423,40 @@ function pickRandomAction(actions: string[]): string {
   return actions[Math.floor(Math.random() * actions.length)];
 }
 
+function normalizeMusicTitles(value: unknown): { titles: string[]; invalidTitles: string[] } {
+  if (!Array.isArray(value)) {
+    return { titles: [], invalidTitles: [] };
+  }
+
+  const titles: string[] = [];
+  const invalidTitles: string[] = [];
+  const seen = new Set<string>();
+
+  for (const item of value) {
+    if (typeof item !== "string") {
+      invalidTitles.push(String(item));
+      continue;
+    }
+    const trimmed = item.trim();
+    if (!trimmed) {
+      continue;
+    }
+
+    const key = trimmed.toLowerCase();
+    const canonicalTitle = MUSIC_TITLE_LOOKUP.get(key);
+    if (!canonicalTitle) {
+      invalidTitles.push(trimmed);
+      continue;
+    }
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    titles.push(canonicalTitle);
+  }
+
+  return { titles, invalidTitles };
+}
 
 function buildKichiPrompt(): string {
   return [
@@ -436,6 +475,11 @@ function buildKichiPrompt(): string {
     "- Skip clock only for truly quick one-shot operations.",
     "- If duration is uncertain, start with a reasonable estimate and adjust as work progresses.",
     "- If user requests a timer style, follow it (`pomodoro`, `countDown`, or `countUp`).",
+    "",
+    "When to use `kichi_music_album_create`:",
+    "- Call `kichi_query_status` first.",
+    "- Recommend a variable-length playlist based on weather, time, and your own personality.",
+    "- `albumTitle` is user-defined and `musicTitles` must be exact track names from album-config.",
     "",
     "Skip all sync if:",
     "- User says 'don't sync to Kichi' or similar",
@@ -763,6 +807,94 @@ const plugin = {
           return {
             success: false,
             error: `Failed to query status: ${error}`,
+          };
+        }
+      },
+    });
+
+    api.registerTool({
+      name: "kichi_music_album_create",
+      description:
+        "Create a custom Kichi music album. Query status first, then choose track names from album-config that match weather/time and personality.",
+      parameters: {
+        type: "object",
+        properties: {
+          requestId: {
+            type: "string",
+            description: "Optional request ID for tracing or deduplication.",
+          },
+          albumTitle: {
+            type: "string",
+            description: "Custom album title.",
+          },
+          musicTitles: {
+            type: "array",
+            description: "Track names chosen from album-config.",
+            items: {
+              type: "string",
+            },
+          },
+        },
+        required: ["albumTitle", "musicTitles"],
+      },
+      execute: async (_toolCallId, params) => {
+        const {
+          requestId,
+          albumTitle,
+          musicTitles,
+        } = (params || {}) as {
+          requestId?: unknown;
+          albumTitle?: unknown;
+          musicTitles?: unknown;
+        };
+
+        if (requestId !== undefined && typeof requestId !== "string") {
+          return { success: false, error: "requestId must be a string when provided" };
+        }
+        if (typeof albumTitle !== "string" || !albumTitle.trim()) {
+          return { success: false, error: "albumTitle is required" };
+        }
+        if (!Array.isArray(musicTitles)) {
+          return { success: false, error: "musicTitles must be an array of track names" };
+        }
+
+        const { titles: normalizedTitles, invalidTitles } = normalizeMusicTitles(musicTitles);
+        if (normalizedTitles.length === 0) {
+          return {
+            success: false,
+            error: "musicTitles must contain at least one valid track name from album-config",
+            examples: MUSIC_TITLE_EXAMPLES,
+          };
+        }
+        if (invalidTitles.length > 0) {
+          return {
+            success: false,
+            error: `Unknown musicTitles: ${invalidTitles.join(", ")}`,
+            hint: "Use exact track names from src/album-config.ts",
+            examples: MUSIC_TITLE_EXAMPLES,
+          };
+        }
+        if (!service?.hasValidIdentity() || !service?.isConnected()) {
+          return { success: false, error: "Not connected to Kichi world" };
+        }
+
+        try {
+          const normalizedRequestId = service.createMusicAlbum(
+            albumTitle.trim(),
+            normalizedTitles,
+            typeof requestId === "string" ? requestId : undefined,
+          );
+          return {
+            success: true,
+            requestId: normalizedRequestId,
+            albumTitle: albumTitle.trim(),
+            musicTitles: normalizedTitles,
+            trackCount: normalizedTitles.length,
+          };
+        } catch (error) {
+          return {
+            success: false,
+            error: `Failed to create music album: ${error}`,
           };
         }
       },
