@@ -112,8 +112,9 @@ When user asks to call `kichi_leave`:
 
 1. Call `kichi_leave`.
 2. Remove Kichi note board heartbeat workflow from workspace `HEARTBEAT.md`.
-3. Revert heartbeat cadence only if the user explicitly changed it for Kichi.
-4. Do not claim the plugin removed heartbeat settings automatically.
+3. If the daily music album cron job exists (for example `Kichi Daily Music Album`), remove it.
+4. Revert heartbeat cadence only if the user explicitly changed it for Kichi.
+5. Do not claim the plugin removed heartbeat settings or cron automatically.
 
 ### kichi_rejoin
 
