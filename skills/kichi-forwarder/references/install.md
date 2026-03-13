@@ -1,4 +1,4 @@
-# Install
+﻿# Install
 
 Save `avatarId` to `identity.json` before using `kichi_join`:
 
@@ -54,7 +54,7 @@ execute in this fixed order:
 2. Ensure `kichi-runtime-config.json` exists and includes action lists for `stand`/`sit`/`lay`/`floor`.
 3. Complete `Session Startup Rule` and `First Join Gate` from [heartbeat.md](heartbeat.md).
 4. Call `kichi_status`.
-5. If `authKey` is missing, call `kichi_join` with provided `AvatarId`.
+5. If `authKey` is missing, call `kichi_join` with provided `AvatarId`, `botName`, `bio`, and `tags`.
 6. Call `kichi_status` again and confirm connection/auth state.
 
 Do not mark onboarding complete if step 2 or step 3 is not completed, even when join succeeded.

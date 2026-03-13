@@ -9,6 +9,7 @@ import type {
   ClockConfig,
   ClockPayload,
   CreateMusicAlbumPayload,
+  JoinPayload,
   KichiConnectionStatus,
   CreateNotesBoardNotePayload,
   KichiForwarderConfig,
@@ -60,12 +61,13 @@ export class KichiForwarderService {
     avatarId: string,
     botName: string,
     bio: string,
+    tags: string[],
   ): Promise<string | null> {
     return new Promise((resolve) => {
       this.identity = { avatarId };
       this.joinResolve = resolve;
-      const sendJoin = () =>
-        this.ws?.send(JSON.stringify({ type: "join", avatarId, botName, bio }));
+      const payload: JoinPayload = { type: "join", avatarId, botName, bio, tags };
+      const sendJoin = () => this.ws?.send(JSON.stringify(payload));
       if (this.ws?.readyState === WebSocket.OPEN) {
         sendJoin();
       } else {

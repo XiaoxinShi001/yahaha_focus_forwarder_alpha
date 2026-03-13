@@ -31,7 +31,7 @@ run this exact sequence without skipping steps:
 4. Ensure `kichi-runtime-config.json` is persisted with animation/action config for `stand`/`sit`/`lay`/`floor`.
 5. Complete `Session Startup Rule` and `First Join Gate` from [references/heartbeat.md](references/heartbeat.md).
 6. Call `kichi_status`.
-7. If `authKey` is missing, call `kichi_join` using parsed `AvatarId`, `botName`, and `bio`.
+7. If `authKey` is missing, call `kichi_join` using parsed `AvatarId`, `botName`, `bio`, and `tags`.
 8. Call `kichi_status` again to verify websocket is ready and `authKey` exists.
 9. Do not report setup/join success unless join checks, heartbeat checks, and runtime config checks are complete.
 
@@ -84,12 +84,13 @@ Use this order unless user asks for a different explicit action:
 Join Kichi World:
 
 ```text
-kichi_join(avatarId: "your-avatar-id", botName: "<from IDENTITY.md>", bio: "<from SOUL.md>")
+kichi_join(avatarId: "your-avatar-id", botName: "<from IDENTITY.md>", bio: "<from SOUL.md>", tags: ["calm", "focused", "curious"])
 ```
 
 - `botName`: required
 - `bio`: required
 - `avatarId`: optional. If omitted, tool reads `avatarId` from `identity.json`. If missing, call fails.
+- `tags`: optional string list. These tags represent OpenClaw's self-perceived personality labels. Empty strings are ignored and duplicates are removed. If omitted, the join payload sends `[]`.
 
 On success, `identity.json` contains:
 

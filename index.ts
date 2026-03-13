@@ -296,6 +296,36 @@ function isPositiveInteger(value: unknown): value is number {
   return typeof value === "number" && Number.isInteger(value) && value > 0;
 }
 
+function normalizeJoinTags(value: unknown): { tags?: string[]; error?: string } {
+  if (value === undefined) {
+    return { tags: [] };
+  }
+  if (!Array.isArray(value)) {
+    return { error: "tags must be an array of strings" };
+  }
+
+  const tags: string[] = [];
+  const seen = new Set<string>();
+
+  for (const item of value) {
+    if (typeof item !== "string") {
+      return { error: "tags must be an array of strings" };
+    }
+    const trimmed = item.trim();
+    if (!trimmed) {
+      continue;
+    }
+    const key = trimmed.toLowerCase();
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    tags.push(trimmed);
+  }
+
+  return { tags };
+}
+
 function isClockAction(value: unknown): value is ClockAction {
   return ["set", "stop"].includes(String(value));
 }
@@ -513,7 +543,7 @@ const plugin = {
 
     api.registerTool({
       name: "kichi_join",
-      description: "Join Kichi world with avatarId, the current bot name, and a short bio",
+      description: "Join Kichi world with avatarId, the current bot name, a short bio, and personality tags",
       parameters: {
         type: "object",
         properties: {
@@ -526,6 +556,11 @@ const plugin = {
             type: "string",
             description: "Short bio covering OpenClaw personality and role",
           },
+          tags: {
+            type: "array",
+            description: "Optional list of OpenClaw self-perceived personality tags",
+            items: { type: "string" },
+          },
         },
         required: ["botName", "bio"],
       },
@@ -533,6 +568,9 @@ const plugin = {
         let avatarId = (params as { avatarId?: string } | null)?.avatarId;
         const botName = (params as { botName?: string } | null)?.botName?.trim();
         const bio = (params as { bio?: string } | null)?.bio?.trim();
+        const { tags, error: tagsError } = normalizeJoinTags(
+          (params as { tags?: unknown } | null)?.tags,
+        );
         if (!avatarId) {
           try {
             const identity = JSON.parse(fs.readFileSync(IDENTITY_PATH, "utf-8")) as {
@@ -550,7 +588,10 @@ const plugin = {
         if (!bio) {
           return { success: false, error: "No bio" };
         }
-        const result = await service?.join(avatarId, botName, bio);
+        if (tagsError) {
+          return { success: false, error: tagsError };
+        }
+        const result = await service?.join(avatarId, botName, bio, tags ?? []);
         return result ? { success: true, authKey: result } : { success: false, error: "Failed" };
       },
     });
