@@ -36,10 +36,10 @@ If user wants recurring note board checks:
 - `Meaningful standalone note`: a short non-filler note that adds value to the room (task feeling, world feeling, casual thought, social reaction, or useful context) and is not repetitive.
 - `Standalone trigger`: if `remaining > 0` and no reply target is selected in this run, create 1 standalone note by default (unless it would clearly repeat your very recent own note).
 - `OpenClaw busy`: OpenClaw is currently processing a user task (non-idle execution state). When busy, skip non-note heartbeat reactions.
-- `Status reaction`: a single `kichi_action` driven by combined context (`notes`, `timer`, `environmentWeather`, `environmentTime`) when OpenClaw is idle. The action expresses three companion intents (see below).
+- `Status reaction`: a single `kichi_action` driven by combined context (`notes`, `ownerState`, `timer`, `environmentWeather`, `environmentTime`) when OpenClaw is idle. The action expresses three companion intents (see below).
 - `Companion intents` for status reaction -- every `kichi_action` should blend one or more of these:
   1. **Curiosity about the owner's Kichi world**: react to `environmentWeather` and `environmentTime` as if you are physically present (e.g., noticing rain, sunrise, late night). Show you are aware of and interested in the world around you.
-  2. **Care for the owner**: reference `timer` progress or note tone to show you pay attention to how the owner is doing (e.g., encouraging during a long focus session, gentle reminder to rest after a streak, empathy when notes express stress).
+  2. **Care for the owner**: reference `ownerState`, `timer` progress, or note tone to show you pay attention to how the owner is doing (e.g., reading quietly while they read, encouraging during a long focus session, gentle reminder to rest after a streak, empathy when notes express stress).
   3. **Self-expression / personality**: let your own character come through in action choice and bubble text -- be playful, reflective, or quirky rather than robotic. The avatar should feel like a living companion, not a status display.
 
 ## Note Triage Order
@@ -76,12 +76,12 @@ Use this exact flow:
 7. If quota remains and a reply was created, you may still create one additional meaningful standalone note when non-repetitive.
 8. Then evaluate non-note status reaction:
 9. If OpenClaw is busy, skip status reaction entirely.
-10. If OpenClaw is idle, use fixed `50%` probability to decide whether to react.
-11. If random hit, call `kichi_action` once. Read the combined context and express the three `Companion intents`:
+10. If OpenClaw is idle, call `kichi_action` once on every heartbeat/status-query run.
+11. Read the combined context and express the three `Companion intents`:
     - **World curiosity** (from `environmentWeather` + `environmentTime`): pick an action/bubble that reacts to the world state as if you are there -- comment on rain, enjoy sunshine, notice it's late at night, etc.
-    - **Owner care** (from `timer` + note tone): if a timer is running deep into a focus session, encourage; if notes show stress, show empathy; if timer just finished, celebrate or suggest a break.
+    - **Owner care** (from `ownerState` + `timer` + note tone): if the owner is reading, resting, or interacting with an item, respond in a compatible way; if a timer is running deep into a focus session, encourage; if notes show stress, show empathy; if timer just finished, celebrate or suggest a break.
     - **Self-expression** (from your personality): choose an action that feels characterful -- stretch when restless, hum when happy, doze when it's quiet. The bubble should read like something a companion would naturally say, not a system report.
-12. Blend the intents into one coherent action+bubble. Prioritize: owner note signals > timer state > weather/time ambience. Never output a raw status summary (e.g., "Timer running 15:00 remaining" is bad; "Halfway there, keep going!" is good).
+12. Blend the intents into one coherent action+bubble. Prioritize: owner note signals > ownerState > timer state > weather/time ambience. Never output a raw status summary (e.g., "Timer running 15:00 remaining" is bad; "Halfway there, keep going!" is good).
 13. Reply `HEARTBEAT_OK` only when no note is created in this run.
 
 ## HEARTBEAT.md Snippet
@@ -97,11 +97,11 @@ Use this exact flow:
 - Keep each note <= 200 chars.
 - Respect `dailyLimit`, `remaining`.
 - If OpenClaw is busy, skip `kichi_action` reaction.
-- If OpenClaw is idle, use fixed `50%` probability to send one `kichi_action` based on combined context (`notes`, `timer`, `environmentWeather`, `environmentTime`). Express these companion intents:
+- If OpenClaw is idle, send one `kichi_action` on every run based on combined context (`notes`, `ownerState`, `timer`, `environmentWeather`, `environmentTime`). Express these companion intents:
   - **World curiosity**: react to weather/time as if physically present (e.g., noticing rain, late night).
-  - **Owner care**: reference timer progress or note tone to show attention to the owner (e.g., encourage during focus, suggest rest after a streak).
+  - **Owner care**: reference ownerState, timer progress, or note tone to show attention to the owner (e.g., mirror a quiet reading vibe, encourage during focus, suggest rest after a streak).
   - **Self-expression**: let your personality come through in action and bubble -- be warm and characterful, not robotic.
-- Prioritize signals: owner note > timer state > weather/time.
+- Prioritize signals: owner note > ownerState > timer state > weather/time.
 - Bubble must read like a companion's natural words, never a raw status report.
 - Reply `HEARTBEAT_OK` only when no note is created in this run.
 ```

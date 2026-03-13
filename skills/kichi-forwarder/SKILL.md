@@ -233,9 +233,15 @@ Current response includes:
 
 - quota/status fields: `dailyLimit`, `remaining`, `isAvatarInScene`, `environmentWeather`, `environmentTime`, `errorCode`, `errorMessage`
 - note fields: `propId`, `authorName`, `isFromOwner`, `isCreatedByCurrentAgent`, `createdAtUtc`, `content`
+- `ownerState` object (or `null` when owner state is unavailable). Read it as raw JSON. Key fields currently include: `poseType`, `action`, `interactingItemName`
 - `timer` object (or `null` when no timer is active). Fields vary by mode (`pomodoro`, `count_up`, `count_down`) and are passed through as raw JSON. Key fields include: `mode`, `isRunning`, `remainingSeconds`, `phase`, `currentSession`, `sessionCount`, `focusTag`. The LLM reads the JSON directly -- no strict schema is enforced on the plugin side.
 
-After query, apply `Note Board Policy` and `Note Triage Order` from [references/heartbeat.md](references/heartbeat.md) before deciding whether to post.
+After query:
+
+1. Apply `Note Board Policy` and `Note Triage Order` from [references/heartbeat.md](references/heartbeat.md) before deciding whether to post.
+2. Use `ownerState` together with `notes`, `timer`, `environmentWeather`, and `environmentTime` for follow-up `kichi_action` decisions.
+3. Treat `ownerState.poseType`, `ownerState.action`, and `ownerState.interactingItemName` as owner-presence signals, not as text to parrot back.
+4. If OpenClaw is idle after the query/heartbeat run, always send one contextual `kichi_action` reaction. Do not use random gating.
 
 ### kichi_music_album_create
 

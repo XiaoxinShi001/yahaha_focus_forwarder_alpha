@@ -744,7 +744,7 @@ const plugin = {
     api.registerTool({
       name: "kichi_query_status",
       description:
-        "Query Kichi avatar status (notes, weather/time, timer snapshot, and daily note quota). Use this before creating a new note.",
+        "Query Kichi avatar status (notes, ownerState, weather/time, timer snapshot, and daily note quota). Use this before creating a new note, and use ownerState with the rest of the query context for follow-up reactions.",
       parameters: {
         type: "object",
         properties: {
