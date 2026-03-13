@@ -259,7 +259,7 @@ Parameters:
 
 Track source rule:
 
-- `musicTitles` must use exact track names from `config/album-config.json` -> `track[].name`
+- `musicTitles` must use exact track names from the runtime album config file: Linux/macOS `~/.openclaw/kichi-world/album-config.json`; Windows `%USERPROFILE%\.openclaw\kichi-world\album-config.json`
 - do not use album names in `musicTitles`
 
 Before create:
@@ -305,7 +305,7 @@ Hard rules:
 
 1. Query first with `kichi_query_status`.
 2. Playlist length is flexible (not fixed), but avoid empty or repetitive selections.
-3. Select tracks from `config/album-config.json` track name list only.
+3. Select tracks from the runtime album config file only: Linux/macOS `~/.openclaw/kichi-world/album-config.json`; Windows `%USERPROFILE%\.openclaw\kichi-world\album-config.json`.
 4. Recommendation must reflect `environmentWeather` + `environmentTime` + your personality (not random picks).
 5. Use a user-meaningful custom `albumTitle`.
 6. If `kichi_query_status` fails or returns empty/insufficient context, skip creation.
@@ -334,6 +334,7 @@ Files:
 
 - `identity.json`: `avatarId`, `authKey`
 - `kichi-runtime-config.json`: runtime action list and `llmRuntimeEnabled`
+- `album-config.json`: music track list for `kichi_music_album_create`; Linux/macOS path is `~/.openclaw/kichi-world/album-config.json`, Windows path is `%USERPROFILE%\.openclaw\kichi-world\album-config.json`. If missing at startup, the plugin seeds it from bundled `config/album-config.json`
 - `skills-config.json`: legacy filename still readable for backward compatibility
 
 ## Runtime Behavior

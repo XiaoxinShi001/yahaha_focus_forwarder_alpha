@@ -58,17 +58,14 @@ const KICHI_WORLD_DIR = path.join(os.homedir(), ".openclaw", "kichi-world");
 const RUNTIME_CONFIG_PATH = path.join(KICHI_WORLD_DIR, "kichi-runtime-config.json");
 const LEGACY_SKILLS_CONFIG_PATH = path.join(KICHI_WORLD_DIR, "skills-config.json");
 const IDENTITY_PATH = path.join(KICHI_WORLD_DIR, "identity.json");
+const RUNTIME_ALBUM_CONFIG_PATH = path.join(KICHI_WORLD_DIR, "album-config.json");
 const MAX_NOTEBOARD_TEXT_LENGTH = 200;
-const ALBUM_CONFIG_PATH = new URL("./config/album-config.json", import.meta.url);
-const DEFAULT_ALBUM_CONFIG = loadAlbumConfig();
-const MUSIC_TITLE_LOOKUP = new Map(
-  DEFAULT_ALBUM_CONFIG.track.map((item) => [item.name.toLowerCase(), item.name] as const),
-);
-const MUSIC_TITLE_ENUM = DEFAULT_ALBUM_CONFIG.track.map((item) => item.name);
-const MUSIC_TITLE_EXAMPLES = DEFAULT_ALBUM_CONFIG.track.slice(0, 10).map((item) => item.name);
+const BUNDLED_ALBUM_CONFIG_PATH = new URL("./config/album-config.json", import.meta.url);
 let cachedConfig: KichiRuntimeConfig | null = null;
 let cachedConfigMtime = 0;
 let cachedConfigPath = "";
+let cachedAlbumConfig: Album | null = null;
+let cachedAlbumConfigMtime = 0;
 let service: KichiForwarderService | null = null;
 let pluginApi: OpenClawPluginApi | null = null;
 
@@ -93,13 +90,53 @@ function isAlbumConfig(value: unknown): value is Album {
     });
 }
 
-function loadAlbumConfig(): Album {
-  const raw = fs.readFileSync(ALBUM_CONFIG_PATH, "utf-8");
+function loadAlbumConfigFromPath(configPath: string | URL): Album {
+  const raw = fs.readFileSync(configPath, "utf-8");
   const parsed = JSON.parse(raw) as unknown;
   if (!isAlbumConfig(parsed)) {
-    throw new Error("Invalid album config at config/album-config.json");
+    throw new Error(`Invalid album config at ${String(configPath)}`);
   }
   return parsed;
+}
+
+function ensureRuntimeAlbumConfig(): void {
+  fs.mkdirSync(KICHI_WORLD_DIR, { recursive: true });
+  if (!fs.existsSync(RUNTIME_ALBUM_CONFIG_PATH)) {
+    fs.copyFileSync(BUNDLED_ALBUM_CONFIG_PATH, RUNTIME_ALBUM_CONFIG_PATH);
+    pluginApi?.logger.debug("[kichi] seeded runtime album config from bundled config");
+    return;
+  }
+
+  try {
+    loadAlbumConfigFromPath(RUNTIME_ALBUM_CONFIG_PATH);
+  } catch (error) {
+    pluginApi?.logger.warn(`[kichi] invalid runtime album config, resetting from bundled config: ${error}`);
+    fs.copyFileSync(BUNDLED_ALBUM_CONFIG_PATH, RUNTIME_ALBUM_CONFIG_PATH);
+  }
+}
+
+function loadRuntimeAlbumConfig(): Album {
+  ensureRuntimeAlbumConfig();
+  const stat = fs.statSync(RUNTIME_ALBUM_CONFIG_PATH);
+  if (!cachedAlbumConfig || stat.mtimeMs !== cachedAlbumConfigMtime) {
+    cachedAlbumConfig = loadAlbumConfigFromPath(RUNTIME_ALBUM_CONFIG_PATH);
+    cachedAlbumConfigMtime = stat.mtimeMs;
+  }
+  return cachedAlbumConfig;
+}
+
+function getMusicTitleLookup(): Map<string, string> {
+  return new Map(
+    loadRuntimeAlbumConfig().track.map((item) => [item.name.toLowerCase(), item.name] as const),
+  );
+}
+
+function getMusicTitleEnum(): string[] {
+  return loadRuntimeAlbumConfig().track.map((item) => item.name);
+}
+
+function getMusicTitleExamples(): string[] {
+  return loadRuntimeAlbumConfig().track.slice(0, 10).map((item) => item.name);
 }
 
 function sanitizeActions(value: unknown, fallback: string[]): string[] {
@@ -406,6 +443,7 @@ function normalizeMusicTitles(value: unknown): { titles: string[]; invalidTitles
     return { titles: [], invalidTitles: [] };
   }
 
+  const musicTitleLookup = getMusicTitleLookup();
   const titles: string[] = [];
   const invalidTitles: string[] = [];
   const seen = new Set<string>();
@@ -421,7 +459,7 @@ function normalizeMusicTitles(value: unknown): { titles: string[]; invalidTitles
     }
 
     const key = trimmed.toLowerCase();
-    const canonicalTitle = MUSIC_TITLE_LOOKUP.get(key);
+    const canonicalTitle = musicTitleLookup.get(key);
     if (!canonicalTitle) {
       invalidTitles.push(trimmed);
       continue;
@@ -439,13 +477,13 @@ function normalizeMusicTitles(value: unknown): { titles: string[]; invalidTitles
 function buildMusicAlbumToolDescription(): string {
   return [
     "Create a custom Kichi music album.",
-    "Query status first, then choose track names from the local config/album-config.json that match weather, time, and personality.",
+    "Query status first, then choose track names from the runtime album config: Linux/macOS `~/.openclaw/kichi-world/album-config.json`; Windows `%USERPROFILE%\\.openclaw\\kichi-world\\album-config.json`.",
   ].join("\n");
 }
 
 function buildMusicTitlesDescription(): string {
   return [
-    "Track names chosen from the local config/album-config.json.",
+    "Track names chosen from the runtime album config: Linux/macOS `~/.openclaw/kichi-world/album-config.json`; Windows `%USERPROFILE%\\.openclaw\\kichi-world\\album-config.json`.",
     "Use exact names only; the available titles are injected into this tool schema.",
   ].join(" ");
 }
@@ -473,7 +511,7 @@ function buildKichiPrompt(): string {
     "When to use `kichi_music_album_create`:",
     "- Call `kichi_query_status` first.",
     "- Recommend a variable-length playlist based on weather, time, and your own personality.",
-    "- `albumTitle` is user-defined and `musicTitles` must be exact track names from the local album-config.json.",
+    "- `albumTitle` is user-defined and `musicTitles` must be exact track names from the runtime album config under the user's home directory.",
     "",
     "Skip all sync if:",
     "- User says 'don't sync to Kichi' or similar",
@@ -491,7 +529,9 @@ const plugin = {
 
   register(api: OpenClawPluginApi) {
     pluginApi = api;
+    ensureRuntimeAlbumConfig();
     registerPluginHooks(api);
+    const musicTitleEnum = getMusicTitleEnum();
 
     api.registerService({
       id: "kichi-forwarder",
@@ -843,7 +883,7 @@ const plugin = {
             description: buildMusicTitlesDescription(),
             items: {
               type: "string",
-              enum: MUSIC_TITLE_ENUM,
+              enum: musicTitleEnum,
             },
           },
         },
@@ -875,15 +915,15 @@ const plugin = {
           return {
             success: false,
             error: "musicTitles must contain at least one valid track name from album-config",
-            examples: MUSIC_TITLE_EXAMPLES,
+            examples: getMusicTitleExamples(),
           };
         }
         if (invalidTitles.length > 0) {
           return {
             success: false,
             error: `Unknown musicTitles: ${invalidTitles.join(", ")}`,
-            hint: "Use exact track names from config/album-config.json",
-            examples: MUSIC_TITLE_EXAMPLES,
+            hint: "Use exact track names from the runtime album config under the user's home directory",
+            examples: getMusicTitleExamples(),
           };
         }
         if (!service?.hasValidIdentity() || !service?.isConnected()) {

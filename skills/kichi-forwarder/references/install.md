@@ -115,4 +115,5 @@ Files:
 
 - `identity.json`: `avatarId`, `authKey`
 - `kichi-runtime-config.json`: runtime action list and `llmRuntimeEnabled`
+- `album-config.json`: music track list used by music album creation; Linux/macOS path is `~/.openclaw/kichi-world/album-config.json`, Windows path is `%USERPROFILE%\.openclaw\kichi-world\album-config.json`. If missing at startup, the plugin seeds it from bundled `config/album-config.json`
 - `skills-config.json`: legacy filename still readable for backward compatibility
