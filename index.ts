@@ -2,11 +2,11 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
-import { DEFAULT_ALBUM_CONFIG } from "./src/album-config.js";
 import { parse } from "./src/config.js";
 import { KichiForwarderService } from "./src/service.js";
 import type {
   ActionResult,
+  Album,
   ClockAction,
   ClockConfig,
   KichiRuntimeConfig,
@@ -59,15 +59,48 @@ const RUNTIME_CONFIG_PATH = path.join(KICHI_WORLD_DIR, "kichi-runtime-config.jso
 const LEGACY_SKILLS_CONFIG_PATH = path.join(KICHI_WORLD_DIR, "skills-config.json");
 const IDENTITY_PATH = path.join(KICHI_WORLD_DIR, "identity.json");
 const MAX_NOTEBOARD_TEXT_LENGTH = 200;
+const ALBUM_CONFIG_PATH = new URL("./config/album-config.json", import.meta.url);
+const DEFAULT_ALBUM_CONFIG = loadAlbumConfig();
 const MUSIC_TITLE_LOOKUP = new Map(
   DEFAULT_ALBUM_CONFIG.track.map((item) => [item.name.toLowerCase(), item.name] as const),
 );
+const MUSIC_TITLE_ENUM = DEFAULT_ALBUM_CONFIG.track.map((item) => item.name);
 const MUSIC_TITLE_EXAMPLES = DEFAULT_ALBUM_CONFIG.track.slice(0, 10).map((item) => item.name);
 let cachedConfig: KichiRuntimeConfig | null = null;
 let cachedConfigMtime = 0;
 let cachedConfigPath = "";
 let service: KichiForwarderService | null = null;
 let pluginApi: OpenClawPluginApi | null = null;
+
+function isAlbumConfig(value: unknown): value is Album {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const config = value as Partial<Album>;
+  return typeof config.albumCount === "number"
+    && typeof config.trackCount === "number"
+    && Array.isArray(config.track)
+    && config.track.every((item) => {
+      if (!item || typeof item !== "object") {
+        return false;
+      }
+      const track = item as Record<string, unknown>;
+      return typeof track.album === "string"
+        && typeof track.name === "string"
+        && Array.isArray(track.tags)
+        && track.tags.every((tag) => typeof tag === "string");
+    });
+}
+
+function loadAlbumConfig(): Album {
+  const raw = fs.readFileSync(ALBUM_CONFIG_PATH, "utf-8");
+  const parsed = JSON.parse(raw) as unknown;
+  if (!isAlbumConfig(parsed)) {
+    throw new Error("Invalid album config at config/album-config.json");
+  }
+  return parsed;
+}
 
 function sanitizeActions(value: unknown, fallback: string[]): string[] {
   if (!Array.isArray(value)) {
@@ -403,6 +436,20 @@ function normalizeMusicTitles(value: unknown): { titles: string[]; invalidTitles
   return { titles, invalidTitles };
 }
 
+function buildMusicAlbumToolDescription(): string {
+  return [
+    "Create a custom Kichi music album.",
+    "Query status first, then choose track names from the local config/album-config.json that match weather, time, and personality.",
+  ].join("\n");
+}
+
+function buildMusicTitlesDescription(): string {
+  return [
+    "Track names chosen from the local config/album-config.json.",
+    "Use exact names only; the available titles are injected into this tool schema.",
+  ].join(" ");
+}
+
 function buildKichiPrompt(): string {
   return [
     "Kichi App status sync is available via `kichi_action` and `kichi_clock`.",
@@ -426,7 +473,7 @@ function buildKichiPrompt(): string {
     "When to use `kichi_music_album_create`:",
     "- Call `kichi_query_status` first.",
     "- Recommend a variable-length playlist based on weather, time, and your own personality.",
-    "- `albumTitle` is user-defined and `musicTitles` must be exact track names from album-config.",
+    "- `albumTitle` is user-defined and `musicTitles` must be exact track names from the local album-config.json.",
     "",
     "Skip all sync if:",
     "- User says 'don't sync to Kichi' or similar",
@@ -779,8 +826,7 @@ const plugin = {
 
     api.registerTool({
       name: "kichi_music_album_create",
-      description:
-        "Create a custom Kichi music album. Query status first, then choose track names from album-config that match weather/time and personality.",
+      description: buildMusicAlbumToolDescription(),
       parameters: {
         type: "object",
         properties: {
@@ -794,9 +840,10 @@ const plugin = {
           },
           musicTitles: {
             type: "array",
-            description: "Track names chosen from album-config.",
+            description: buildMusicTitlesDescription(),
             items: {
               type: "string",
+              enum: MUSIC_TITLE_ENUM,
             },
           },
         },
@@ -835,7 +882,7 @@ const plugin = {
           return {
             success: false,
             error: `Unknown musicTitles: ${invalidTitles.join(", ")}`,
-            hint: "Use exact track names from src/album-config.ts",
+            hint: "Use exact track names from config/album-config.json",
             examples: MUSIC_TITLE_EXAMPLES,
           };
         }

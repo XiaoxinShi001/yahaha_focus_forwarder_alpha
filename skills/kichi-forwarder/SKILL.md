@@ -259,7 +259,7 @@ Parameters:
 
 Track source rule:
 
-- `musicTitles` must use exact track names from `src/album-config.ts` -> `DEFAULT_ALBUM_CONFIG.track[].name`
+- `musicTitles` must use exact track names from `config/album-config.json` -> `track[].name`
 - do not use album names in `musicTitles`
 
 Before create:
@@ -305,7 +305,7 @@ Hard rules:
 
 1. Query first with `kichi_query_status`.
 2. Playlist length is flexible (not fixed), but avoid empty or repetitive selections.
-3. Select tracks from `src/album-config.ts` track name list only.
+3. Select tracks from `config/album-config.json` track name list only.
 4. Recommendation must reflect `environmentWeather` + `environmentTime` + your personality (not random picks).
 5. Use a user-meaningful custom `albumTitle`.
 6. If `kichi_query_status` fails or returns empty/insufficient context, skip creation.

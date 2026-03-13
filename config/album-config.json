@@ -1,6 +1,4 @@
-import type { Album } from "./types.js";
-
-export const DEFAULT_ALBUM_CONFIG: Album = {
+{
   "albumCount": 10,
   "trackCount": 58,
   "track": [
@@ -508,4 +506,4 @@ export const DEFAULT_ALBUM_CONFIG: Album = {
       ]
     }
   ]
-};
+}
