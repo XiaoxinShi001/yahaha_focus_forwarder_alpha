@@ -9,6 +9,7 @@ export type ActionResult = {
   poseType: PoseType;
   action: string;
   bubble: string;
+  log?: string;
 };
 
 export type KichiRuntimeConfig = {

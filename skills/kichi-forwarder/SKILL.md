@@ -151,12 +151,18 @@ Use this to confirm:
 Send current pose/action:
 
 ```text
-kichi_action(poseType: "sit", action: "Typing with Keyboard", bubble: "Working now")
+kichi_action(
+  poseType: "sit",
+  action: "Typing with Keyboard",
+  bubble: "Working now",
+  log: "Need to sum up news, let me sit and think it through"
+)
 ```
 
 - `poseType`: `stand`, `sit`, `lay`, `floor`
 - `action`: must be in configured action list for that pose
 - `bubble`: optional text, recommended 2-5 words
+- `log`: optional first-person diary-style note about current operation/action/status/mood, max 20 words
 
 ### kichi_clock
 

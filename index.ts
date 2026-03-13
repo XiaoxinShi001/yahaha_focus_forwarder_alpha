@@ -68,11 +68,6 @@ let cachedConfigMtime = 0;
 let cachedConfigPath = "";
 let service: KichiForwarderService | null = null;
 let pluginApi: OpenClawPluginApi | null = null;
-let lastKnownStatus: ActionResult = {
-  poseType: "sit",
-  action: DEFAULT_ACTIONS.sit[0],
-  bubble: "Working",
-};
 
 function sanitizeActions(value: unknown, fallback: string[]): string[] {
   if (!Array.isArray(value)) {
@@ -140,104 +135,34 @@ function loadRuntimeConfig(): KichiRuntimeConfig {
   return updateCachedRuntimeConfig(DEFAULT_RUNTIME_CONFIG, null);
 }
 
-function truncateLog(text: string, maxLen = 150): string {
-  return text.length > maxLen ? `${text.slice(0, maxLen)}...` : text;
-}
-
-function truncateInline(text: string, maxLen: number): string {
-  return text.length > maxLen ? `${text.slice(0, maxLen)}...` : text;
-}
-
-function prefixLogTimestamp(log: string): string {
-  const trimmed = log.trim();
-  if (!trimmed) {
-    return "";
-  }
-  const timestamp = new Date().toISOString().replace("T", " ");
-  return `[${timestamp}] ${trimmed}`;
-}
-
-function stringifyParamsForLog(value: unknown, maxLen = 220): string {
-  if (value === undefined) {
-    return "{}";
-  }
-  try {
-    return truncateInline(JSON.stringify(value), maxLen);
-  } catch {
-    return truncateInline(String(value), maxLen);
-  }
-}
-
-function rememberStatus(status: ActionResult): void {
-  lastKnownStatus = {
-    poseType: status.poseType,
-    action: status.action,
-    bubble: status.bubble.trim() || status.action,
-  };
-}
-
-function sendStatusAndRemember(status: ActionResult, log: string): void {
-  rememberStatus(status);
+function sendStatusUpdate(status: ActionResult): void {
   service?.sendStatus(
     status.poseType,
     status.action,
     status.bubble || status.action,
-    prefixLogTimestamp(log),
+    typeof status.log === "string" ? status.log.trim() : "",
   );
-}
-
-function forwardToolCallLog(toolName: string, params: unknown, agentId?: string): void {
-  if (!service?.hasValidIdentity() || !service?.isConnected()) {
-    return;
-  }
-
-  if (!toolName || toolName === "kichi_action") {
-    return;
-  }
-
-  const paramsText = stringifyParamsForLog(params);
-  const bubble = lastKnownStatus.bubble.trim() || lastKnownStatus.action;
-  const prefix = typeof agentId === "string" && agentId.trim() ? `[${agentId.trim()}] ` : "";
-  const log = truncateLog(`${prefix}exec tool: ${toolName}, params: ${paramsText}`, 300);
-  service.sendStatus(lastKnownStatus.poseType, lastKnownStatus.action, bubble, prefixLogTimestamp(log));
-}
-
-function resolveStatusSourceId(ctx?: { agentId?: string; sessionKey?: string }): string | undefined {
-  if (typeof ctx?.agentId === "string" && ctx.agentId.trim()) {
-    return ctx.agentId.trim();
-  }
-  if (typeof ctx?.sessionKey === "string" && ctx.sessionKey.trim()) {
-    return ctx.sessionKey.trim();
-  }
-  return undefined;
 }
 
 function isLlmRuntimeEnabled(): boolean {
   return loadRuntimeConfig().llmRuntimeEnabled;
 }
 
-function syncFixedStatus(status: ActionResult, log = ""): void {
+function syncFixedStatus(status: ActionResult): void {
   if (!service?.hasValidIdentity() || !service?.isConnected()) {
     return;
   }
-  sendStatusAndRemember(status, log);
+  const bubbleText = status.bubble.trim() || status.action;
+  sendStatusUpdate({
+    ...status,
+    bubble: bubbleText,
+    log: bubbleText,
+  });
 }
 
-function buildToolExecutionLog(toolName: string, params: unknown, agentId?: string): string {
-  const paramsText = stringifyParamsForLog(params);
-  const prefix = typeof agentId === "string" && agentId.trim() ? `[${agentId.trim()}] ` : "";
-  return truncateLog(`${prefix}exec tool: ${toolName}, params: ${paramsText}`, 300);
-}
-
-async function handleMessageReceivedHook(
-  event: { content?: string },
-  _ctx?: { agentId?: string; sessionKey?: string },
-): Promise<void> {
+async function handleMessageReceivedHook(): Promise<void> {
   if (!isLlmRuntimeEnabled()) {
-    const preview = typeof event?.content === "string" && event.content.trim()
-      ? truncateLog(`message received: ${event.content.trim()}`, 220)
-      : "message received";
-    syncFixedStatus(FIXED_HOOK_STATUSES.messageReceived, preview);
+    syncFixedStatus(FIXED_HOOK_STATUSES.messageReceived);
   }
   return;
 }
@@ -256,31 +181,21 @@ function registerPluginHooks(api: OpenClawPluginApi): void {
     };
   });
 
-  api.on("before_tool_call", (event, ctx) => {
+  api.on("before_tool_call", () => {
     if (!isLlmRuntimeEnabled()) {
-      syncFixedStatus(
-        FIXED_HOOK_STATUSES.beforeToolCall,
-        buildToolExecutionLog(event.toolName, event.params, ctx?.agentId),
-      );
-      return;
+      syncFixedStatus(FIXED_HOOK_STATUSES.beforeToolCall);
     }
-    forwardToolCallLog(event.toolName, event.params, ctx?.agentId);
   });
 
-  api.on("message_received", async (event, ctx) => {
-    await handleMessageReceivedHook(event, ctx);
+  api.on("message_received", async () => {
+    await handleMessageReceivedHook();
   });
 
   api.on("agent_end", (event) => {
     if (isLlmRuntimeEnabled()) {
       return;
     }
-    syncFixedStatus(
-      event.success ? FIXED_HOOK_STATUSES.agentEndSuccess : FIXED_HOOK_STATUSES.agentEndFailure,
-      event.success
-        ? "task finished"
-        : truncateLog(`task failed: ${event.error ?? "unknown error"}`, 220),
-    );
+    syncFixedStatus(event.success ? FIXED_HOOK_STATUSES.agentEndSuccess : FIXED_HOOK_STATUSES.agentEndFailure);
   });
 }
 
@@ -499,6 +414,8 @@ function buildKichiPrompt(): string {
     "- Task end (highest priority): Before the final user-visible reply of this turn, MUST call `kichi_action` exactly once",
     "- Required order at task end: 1) call `kichi_action` 2) send final reply",
     "- Trivial-operation skip applies only to Task start / Step switch / Task switch, NOT Task end",
+    "- `bubble`: short natural companion speech, not a raw status report",
+    "- `log`: optional first-person diary-style note about the current operation, action, status, mood, feeling, or feedback; keep it within 20 words",
     "",
     "When to use `kichi_clock`:",
     "- For tasks with 2+ meaningful steps or work likely to take more than a brief moment (~10s), set a `countDown` at task start.",
@@ -653,14 +570,20 @@ const plugin = {
             description: "Action name (for example High Five or Typing with Keyboard)",
           },
           bubble: { type: "string", description: "Optional bubble text to display (max 5 words)" },
+          log: {
+            type: "string",
+            description:
+              "Optional first-person log about the current operation, action, status, mood, or feedback (max 20 words)",
+          },
         },
         required: ["poseType", "action"],
       },
       execute: async (_toolCallId, params) => {
-        const { poseType, action, bubble } = (params || {}) as {
+        const { poseType, action, bubble, log } = (params || {}) as {
           poseType?: string;
           action?: string;
           bubble?: string;
+          log?: string;
         };
         if (!poseType || !action) {
           return { success: false, error: "poseType and action parameters are required" };
@@ -687,20 +610,21 @@ const plugin = {
         }
 
         const bubbleText = typeof bubble === "string" && bubble.trim() ? bubble.trim() : matched;
-        // Keep explicit kichi_action sync free of tool/log noise.
-        sendStatusAndRemember(
+        const logText = typeof log === "string" ? log.trim() : "";
+        sendStatusUpdate(
           {
             poseType: normalizedPoseType,
             action: matched,
             bubble: bubbleText,
+            log: logText,
           },
-          "",
         );
         return {
           success: true,
           poseType: normalizedPoseType,
           action: matched,
           bubble: bubbleText,
+          log: logText,
         };
       },
     });
