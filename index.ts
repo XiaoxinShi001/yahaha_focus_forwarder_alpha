@@ -31,26 +31,31 @@ const FIXED_HOOK_STATUSES: Record<string, ActionResult> = {
     poseType: "sit",
     action: "Study Look At",
     bubble: "Reading request",
+    log: "Leaning in, this request looks interesting",
   },
   beforePromptBuild: {
     poseType: "sit",
     action: "Thinking",
     bubble: "Planning task",
+    log: "Mind pacing, there is a neat angle here",
   },
   beforeToolCall: {
     poseType: "sit",
     action: "Typing with Keyboard",
     bubble: "Working step",
+    log: "Typing hard, this one is kind of fun",
   },
   agentEndSuccess: {
     poseType: "stand",
     action: "Yay",
     bubble: "Task complete",
+    log: "Bouncing a little, that landed cleanly",
   },
   agentEndFailure: {
     poseType: "stand",
     action: "Tired",
     bubble: "Task failed",
+    log: "Shoulders dropped, this one fought back",
   },
 };
 
@@ -223,10 +228,13 @@ function syncFixedStatus(status: ActionResult): void {
     return;
   }
   const bubbleText = status.bubble.trim() || status.action;
+  const logText = typeof status.log === "string" && status.log.trim()
+    ? status.log.trim()
+    : bubbleText;
   sendStatusUpdate({
     ...status,
     bubble: bubbleText,
-    log: bubbleText,
+    log: logText,
   });
 }
 
@@ -500,7 +508,9 @@ function buildKichiPrompt(): string {
     "- Required order at task end: 1) call `kichi_action` 2) send final reply",
     "- Trivial-operation skip applies only to Task start / Step switch / Task switch, NOT Task end",
     "- `bubble`: short natural companion speech, not a raw status report",
-    "- `log`: optional first-person diary-style note about the current operation, action, status, mood, feeling, or feedback; keep it within 20 words",
+    "- `log`: optional first-person inner reaction or personality-forward feedback about the moment; keep it within 20 words",
+    "- `log` should blend the feeling of the chosen action with your personal reaction, not a dry summary of work steps",
+    "- Good pattern for `log`: action feel first, personality feedback second. Example: `Typing fast, this one is fun`",
     "",
     "When to use `kichi_clock`:",
     "- For tasks with 2+ meaningful steps or work likely to take more than a brief moment (~10s), set a `countDown` at task start.",
@@ -660,7 +670,7 @@ const plugin = {
           log: {
             type: "string",
             description:
-              "Optional first-person log about the current operation, action, status, mood, or feedback (max 20 words)",
+              "Optional first-person log that blends the chosen action feeling with personality-forward feedback, not a dry work summary (max 20 words)",
           },
         },
         required: ["poseType", "action"],

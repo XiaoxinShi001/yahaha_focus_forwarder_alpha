@@ -155,14 +155,16 @@ kichi_action(
   poseType: "sit",
   action: "Typing with Keyboard",
   bubble: "Working now",
-  log: "Need to sum up news, let me sit and think it through"
+  log: "Typing hard, this one has some bite"
 )
 ```
 
 - `poseType`: `stand`, `sit`, `lay`, `floor`
 - `action`: must be in configured action list for that pose
 - `bubble`: optional text, recommended 2-5 words
-- `log`: optional first-person diary-style note about current operation/action/status/mood, max 20 words
+- `log`: optional first-person inner reaction or personality-forward feedback, max 20 words
+- `log` should blend the chosen action feeling with your personal reaction; do not use it as a dry work-summary field
+- Recommended pattern: action feel first, personality feedback second. Example: `Typing hard, this one has some bite`
 
 ### kichi_clock
 
